@@ -5,14 +5,36 @@ CS 410 Term Project · Fall 2026
 
 GeoSearch-IR is a planned search engine for finding New York City restaurants that match both a keyword query and a location. For a request like “quiet café with outdoor seating near Union Square,” the engine will use restaurant tips to estimate textual relevance and geographic distance to favor nearby venues. The project will compare a hybrid ranker with text-only and distance-only baselines.
 
-## Team
+## Team roles and deliverables
 
-- Taeyang Song (`taeyang4`), project coordinator
-- Isaac Simms (`isimms2`)
-- Suman Mookherjee (`sumanm2`)
-- Swarvanu Sanyal (`ssanyal4`)
+### Taeyang Song (`taeyang4`) — Project coordination and hybrid ranking
 
-Workstreams include data preparation, indexing, retrieval, relevance assessment, and benchmarking. The team will integrate and test the components together.
+- Coordinate milestones and agree on venue IDs, query inputs, and ranked-run formats with the team.
+- Combine normalized BM25 scores with distance decay, expose the ranking weight and decay scale, and integrate the text and spatial components into top-k search.
+- Run end-to-end smoke tests and coordinate the final demo and submission.
+- **Handoff.** Provide a runnable hybrid search mode and ranked-run output for evaluation.
+
+### Isaac Simms (`isimms2`) — Dataset preparation and BM25 retrieval
+
+- Inspect the Foursquare files, group and clean tips by venue ID, and join venue metadata and coordinates. Report how many venues have usable text and coordinates and record any exclusions.
+- Build the BM25 index over venue documents and implement the text-only baseline. Expose BM25 scores for venue IDs passed by the hybrid ranker.
+- **Handoff.** Provide the reproducible preprocessing and BM25 indexing commands, the shared venue schema, and the text-only run output.
+
+### Suman Mookherjee (`sumanm2`) — Spatial indexing and distance retrieval
+
+- Compare H3 and S2 for candidate lookup and implement the selected index over the shared venue corpus.
+- Retrieve candidates from cells that cover the search area, compute great-circle distances, and apply exact radius filtering when a radius is specified. Test queries near cell and radius boundaries.
+- Implement the distance-only baseline against the same venue corpus used by the other runs.
+- **Handoff.** Provide the candidate lookup interface, distance scores for the hybrid ranker, and the distance-only run output.
+
+### Swarvanu Sanyal (`ssanyal4`) — Relevance judgments and benchmarking
+
+- Lead the creation of about 25 geo-keyword topics and pool the top results from all three runs. Deduplicate by venue ID and define the grading rubric.
+- Split judging across all four teammates, coordinate a shared calibration round, and consolidate grades into qrels.
+- Compute MAP and NDCG@K against the shared qrels. Benchmark end-to-end latency under the same conditions for all three modes and report median and 95th-percentile latency.
+- **Handoff.** Provide the topics, qrels, evaluation commands, and results for the final report and presentation.
+
+All four teammates will review integration changes, judge a share of the pooled results, and contribute to the report and presentation.
 
 ## Dataset
 
