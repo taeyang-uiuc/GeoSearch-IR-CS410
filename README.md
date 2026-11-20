@@ -99,6 +99,50 @@ flowchart LR
     G --> M["Evaluate each run with MAP and NDCG at K"]
 ```
 
+## Setup
+
+### Dependencies
+
+Activate your pyserini virtual environment, then install the geo dependencies:
+
+```bash
+pip install rtree geopy simplekml
+```
+
+### Geo pipeline
+
+All scripts are run from the repo root.
+
+**1. Build the RTree spatial index**
+
+Reads `src/resources/restaurant_reviews.csv`, indexes all venues with valid coordinates, and runs a sample nearby query to verify the index.
+
+```bash
+python src/geo/create_geo_index.py
+```
+
+**2. Create GeoJSON from CSV**
+
+Reads lat/lon and metadata from the CSV and writes a GeoJSON FeatureCollection.
+
+```bash
+python src/geo/create_geojson_from_pose.py
+```
+
+Output: `src/resources/restaurant_reviews.geojson`
+
+**3. Create KML from GeoJSON**
+
+Reads the GeoJSON and writes a KML file with floating pins at 10 m above ground and vertical extrusion lines to the surface.
+
+```bash
+python src/geo/create_kml_from_geojson.py
+```
+
+Output: `src/resources/restaurant_reviews.kml`
+
+---
+
 ## Course submissions
 
 - **Progress report** — pending
@@ -106,3 +150,9 @@ flowchart LR
 - **Project presentation** — submission link pending
 
 `#SpatioTextualSearch` `#GeoAwareRanking` `#SpatialIndexing` `#POIRetrieval` `#HybridSearch`
+
+
+Currently we decided to use huggingface data looks more like what we need. It has restaurant attributes as well as some review. It is parquet file.
+   https://huggingface.co/datasets/yav1327/restaurant_reviews. 13.1k rows
+4. 
+4. 
