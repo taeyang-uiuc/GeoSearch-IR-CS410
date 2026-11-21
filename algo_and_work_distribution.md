@@ -1,6 +1,9 @@
 # Algorithm 
 
-## data preparation
+## High Level Plan 
+query → filter spatially → Lucene index lookup with docid filter → candidate docs → BM25 scoring → ranked results → rerank based on restaurant-user spatial distance → Return top 2 result with name and address
+
+## Data Preparation
 
 We have geotagged restaurants with couple of attributes and user review.
 
@@ -20,16 +23,18 @@ note: some data engineering needed to prepare the above format. eg. attributes.R
 
 so we have 6 cols. id, name, address, lat, lon and attributes (all attributes smashed into one col).
 
+we prepare a json document using these 6 fields. These documents gets indexed by Lucene.
+
 ## Indexing (textual and spatial)
 
-- prepare BM25 index for restaurant id to restaurant attributes for later querying. 
+- prepare Lucene index for restaurant id to restaurant attributes for later querying. 
 - prepare spatial index ie rtree for restaurant id to lat/lon for later querying. 
 
 ## Query
 
 - when user enters query, we first query spatial index (rtree) to find restaurant ids within 25 mile radius. Assume user gives restuarants of his choice and his lat/lon (curent position). Returns set of docid within that spatial scope. 
-- set this as a docid filter while doing lucene search.  
-- search in bm25 index to find the best 5 fits according to user query as a ranked list
+- set these docids as a docid filter while doing lucene search.  
+- search with bm25 ranking function to find the best 5 fits according to user query as a ranked list
 
 from pyserini.pyclass import autoclass
 
