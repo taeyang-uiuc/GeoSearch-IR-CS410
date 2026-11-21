@@ -12,38 +12,32 @@ GeoSearch-IR is a planned search engine for finding New York City restaurants th
 - Suman Mookherjee (`sumanm2`)
 - Swarvanu Sanyal (`ssanyal4`)
 
-## Planned roles and deliverables
+## Team work division
 
-Role assignments are pending. Member numbers refer to the four workstreams below.
+### Swarvanu Sanyal (`ssanyal4`) — Data, spatial indexing, and ranking direction
 
-### Member 1 — Integration and hybrid ranking
+- Prepare the initial restaurant data for indexing.
+- Implement the R-tree spatial index over restaurant coordinates.
+- Define the distance-decay ranking function that reranks BM25-retrieved documents.
+- Set the project's overall technical direction.
 
-- Agree on integration milestones, venue IDs, query inputs, and ranked-run formats with the team.
-- Combine normalized BM25 scores with distance decay, expose the ranking weight and decay scale, and integrate the text and spatial components into top-k search.
-- Run end-to-end smoke tests and coordinate the final demo and submission.
-- **Handoff.** Provide a runnable hybrid search mode and ranked-run output for evaluation.
+### Suman Mookherjee (`sumanm2`) — BM25 indexing and text retrieval
 
-### Member 2 — Dataset preparation and BM25 retrieval
+- Prepare the BM25 index over restaurant documents.
+- Implement the method that queries documents through the BM25 index.
 
-- Inspect the Foursquare files, group and clean tips by venue ID, and join venue metadata and coordinates. Report how many venues have usable text and coordinates and record any exclusions.
-- Build the BM25 index over venue documents and implement the text-only baseline. Expose BM25 scores for venue IDs passed by the hybrid ranker.
-- **Handoff.** Provide the reproducible preprocessing and BM25 indexing commands, the shared venue schema, and the text-only run output.
+### Taeyang Song (`taeyang4`) — End-to-end hybrid query pipeline
 
-### Member 3 — Spatial indexing and distance retrieval
+- Implement the complete query mechanism.
+- Apply spatial filtering first, then BM25 retrieval over the filtered restaurant documents.
+- Rerank the filtered BM25 results with Swarvanu's spatial distance-decay function.
 
-- Compare H3 and S2 for candidate lookup and implement the selected index over the shared venue corpus.
-- Retrieve candidates from cells that cover the search area, compute great-circle distances, and apply exact radius filtering when a radius is specified. Test queries near cell and radius boundaries.
-- Implement the distance-only baseline against the same venue corpus used by the other runs.
-- **Handoff.** Provide the candidate lookup interface, distance scores for the hybrid ranker, and the distance-only run output.
+### Isaac Simms (`isimms2`) — Evaluation data and evaluation
 
-### Member 4 — Relevance judgments and benchmarking
+- Prepare the evaluation dataset.
+- Evaluate the retrieval results using the agreed measures.
 
-- Lead the creation of about 25 geo-keyword topics and pool the top results from all three runs. Deduplicate by venue ID and define the grading rubric.
-- Split judging across all four teammates, coordinate a shared calibration round, and consolidate grades into qrels.
-- Compute MAP and NDCG@K against the shared qrels. Benchmark end-to-end latency under the same conditions for all three modes and report median and 95th-percentile latency.
-- **Handoff.** Provide the topics, qrels, evaluation commands, and results for the final report and presentation.
-
-All four teammates will review integration changes, judge a share of the pooled results, and contribute to the report and presentation.
+All teammates will fine-tune the algorithm, fix integration issues, and prepare the final report.
 
 ## Dataset
 
@@ -99,50 +93,6 @@ flowchart LR
     G --> M["Evaluate each run with MAP and NDCG at K"]
 ```
 
-## Setup
-
-### Dependencies
-
-Activate your pyserini virtual environment, then install the geo dependencies:
-
-```bash
-pip install rtree geopy simplekml
-```
-
-### Geo pipeline
-
-All scripts are run from the repo root.
-
-**1. Build the RTree spatial index**
-
-Reads `src/resources/restaurant_reviews.csv`, indexes all venues with valid coordinates, and runs a sample nearby query to verify the index.
-
-```bash
-python src/geo/create_geo_index.py
-```
-
-**2. Create GeoJSON from CSV**
-
-Reads lat/lon and metadata from the CSV and writes a GeoJSON FeatureCollection.
-
-```bash
-python src/geo/create_geojson_from_pose.py
-```
-
-Output: `src/resources/restaurant_reviews.geojson`
-
-**3. Create KML from GeoJSON**
-
-Reads the GeoJSON and writes a KML file with floating pins at 10 m above ground and vertical extrusion lines to the surface.
-
-```bash
-python src/geo/create_kml_from_geojson.py
-```
-
-Output: `src/resources/restaurant_reviews.kml`
-
----
-
 ## Course submissions
 
 - **Progress report** — pending
@@ -150,9 +100,3 @@ Output: `src/resources/restaurant_reviews.kml`
 - **Project presentation** — submission link pending
 
 `#SpatioTextualSearch` `#GeoAwareRanking` `#SpatialIndexing` `#POIRetrieval` `#HybridSearch`
-
-
-Currently we decided to use huggingface data looks more like what we need. It has restaurant attributes as well as some review. It is parquet file.
-   https://huggingface.co/datasets/yav1327/restaurant_reviews. 13.1k rows
-4. 
-4. 
