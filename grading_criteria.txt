@@ -1,0 +1,46 @@
+Grading criteria
+Your project accounts for 30% of your total grade and will be graded based on the following weighting scheme, corresponding to three stages of work including 1) project idea pitch and team formation; 2) proposal development; 3) project result submission. All team members will receive the same grade provided that every member has made sufficient effort (at least 20 hours of quality time to work on the project).
+
+Project idea pitch (5%): Students are required to submit project ideas on TextData by the End of Week 4 (Sept 20, 2026). Submissions can be made individually or as a group (if students are already forming a group). For group submission, only one member submits on behalf of the team. Individuals and groups may submit multiple project ideas. The period between the pitch deadline and the proposal deadline is intended for students to form teams and to discuss, develop, and refine their project ideas.
+
+Project proposal (5%): Each project team is required to submit a roughly one-page project proposal by the End of Week 7 (Oct 11, 2026) , which would be graded based on completion, i.e., whether a proposal has included all the following five required elements:  (1) Project Title. Use your project title as the title of your TextData submission and also include the title in the body of the submission.  (2)  Team Members (Names and netID of all members). (3) Project Coordinator: Please specify one team member as the coordinator/leader for the whole team. This person is responsible for making all the required submissions on behalf of the team and the main contact for the instructor and TAs to communicate with as needed.  (4) Project Description: Write ~200 words describing the problem, your high-level approach, and how you plan to demonstrate effectiveness of your approach. (5) Add two special hashtags to indicate that this is a project proposal: #project and #proposal. This would allow the instructors and your peers to easily find your proposal by searching for it using a query such as "#project #proposal".  Please read the project proposal template at
+https://textdata.org/submissions/6ab407c2a8567d79c2f6b605
+ for more information and copy-and-paste it to create your own submission.
+
+Progress report (5%): Each project team is required to add a short 
+progress report, along with the special hashtag #progress, to their 
+project proposal submission on TextData by the End of Week 13 
+(Nov 22, 2026), listing the progress made, remaining tasks, 
+any challenges/issues being faced, etc. It will be graded based on 
+completion with respect to addressing the following three points: 
+(1) Progress made thus far, (2) Remaining tasks, (3)Any challenges/issues being faced.
+
+Software code submission with documentation (65%): Due  on Reading Day (Thur, Dec 10, 2026),
+ each project team will be asked to submit the produced source code with reasonable 
+ documentation to a publicly available repository (e.g., github). 
+ In addition, a link to the URL of this submission must be added to the project proposal
+submission on TextData. The documentation should cover both how to use the software and 
+how the software is implemented. The 65% of the grade would be distributed as follows: 45% 
+for source code submission; 20% for documentation submission. Both would be graded based on 
+completion.
+
+Software usage tutorial presentation (20%): Due  on Reading Day (Thur, Dec 10, 2026), 
+with the following grading method: 10% (out of the 20%) would be based on completion and 
+the remaining 10% based on result of testing the software by graders. 
+The presentation should be submitted to Illinois Media Space (https://mediaspace.illinois.edu/)
+ with a link to it added to the project proposal submission on TextData. 
+ Once you finish the software code and tutorial presentation submissions, 
+ please add the special hashtag #report to your TextData submission to indicate that your 
+ project work is complete.
+
+Thus, your course project work would be graded primarily based on your effort. If you have 
+followed our guidelines and completed all the required tasks, you should receive at least 
+90% of the total points for the project. This is to encourage the students to pay attention 
+to time management and set realistic goals that can actually be completed by the end of the 
+semester. The remaining 10% is based on how well your software works; a fully functioning 
+software would be given the whole 10%, whereas a buggy software or a software with missing 
+functions would result in losing some of the 10% of the grade. Completion of a functioning 
+software is emphasized also due to the potential dependency between multiple projects when 
+they are all contributing to a larger project (e.g., one team may produce a crawler to crawl 
+data for use by another team to build a search engine).
+

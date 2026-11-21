@@ -1,0 +1,41 @@
+(1) Project Title
+
+GeoSearch-IR: A Hybrid Spatio-Textual Search Engine for Point-of-Interest Retrieval
+
+(2) Team Members
+
+Taeyang Song (NetID: (taeyang4) — Project Coordinator
+
+ Isaac Simms (isimms2)
+
+Sumon Mookherjee (sumanm2)
+Swarvanu Sanyal (ssanyal4)
+
+(3) Project Coordinator
+
+Project Coordinator / Lead: Taeyang Song
+(Responsible for submissions and serving as the primary point of contact for instructors and TAs).
+
+(4) Project Description
+
+Point-of-Interest (POI) retrieval requires balancing textual relevance—such as user reviews detailing atmosphere
+or amenities—with spatial proximity to a user's location. Traditional search engines often treat text and spatial
+indexing as separate silos, resulting in suboptimal trade-offs between search accuracy and processing latency.
+
+To address this, we propose building a high-performance hybrid spatio-textual search engine utilizing the
+Huggingface dataset. Our approach combines an inverted text index powered by BM25 scoring with a spatial indexing scheme
+ (such as H3 spatial cells or S2 tiles) to efficiently filter and rank candidate locations.
+ A unified scoring function will compute a linear combination of textual relevance and spatial distance decay.
+
+
+Because the dataset lacks pre-existing relevance judgments, ie qrels, we will implement the classic Cranfield Pooling Method.
+We will draft 25 realistic spatio-textual queries (combining keyword intent and geographic coordinates),
+run multiple baseline retrieval methods to pool the top-10 documents per query, and manually curate relevance grades.
+Finally, we will benchmark our engine on a larger data scale using Mean Average Precision (MAP), NDCG@K,
+and query latency to evaluate the efficiency and effectiveness trade-offs of combining text postings with
+spatial cell filtering.
+
+We are using a dataset from huggingface where geotagged restaurants are there with user review.  
+
+(5) Hashtags
+#project #proposal
