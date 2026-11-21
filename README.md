@@ -95,7 +95,7 @@ flowchart LR
 
 ## Course submissions
 
-- **Progress report** — pending
+- **Progress report** — [PDF](output/pdf/GeoSearch-IR_Progress_Report.pdf)
 - **Project code and documentation** — submission link pending
 - **Project presentation** — submission link pending
 
