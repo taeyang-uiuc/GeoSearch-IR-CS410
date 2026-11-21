@@ -39,6 +39,23 @@ GeoSearch-IR is a planned search engine for finding New York City restaurants th
 
 All teammates will fine-tune the algorithm, fix integration issues, and prepare the final report.
 
+## Hybrid query integration
+
+Taeyang's integration module is implemented in [`src/search/hybrid_search.py`](src/search/hybrid_search.py). It accepts a spatial candidate provider and a filtered BM25 search function, then performs the following steps.
+
+1. Validates the query, coordinates, radius, and ranking weights.
+2. Applies an exact great-circle radius check to R-tree candidates.
+3. Sends the eligible `business_id` values to the BM25 component as an allowed-ID set.
+4. Normalizes BM25 scores, applies a distance-decay score, and returns deterministic top-k results with names, addresses, distances, and component scores.
+
+[`src/search/adapters.py`](src/search/adapters.py) connects the module to the R-tree helper and provides a Pyserini adapter for Lucene filtering through a `TermInSetQuery` on the `business_id` field. The Lucene index must retain `business_id` as a stored, searchable identifier field.
+
+Run the integration tests with:
+
+```bash
+/opt/homebrew/bin/python3 -m unittest discover -s tests -v
+```
+
 ## Dataset
 
 The project uses Dingqi Yang’s **Foursquare NYC Restaurant Rich Dataset**. It covers October 24, 2011 through February 20, 2012 and contains 3,298 venues, 3,112 users, 27,149 check-ins, and 10,377 English-language tips, along with venue tags. Choose the **NYC Restaurant Rich Dataset (Check-ins, Tips, Tags)** entry for the archive and its schema notes. [Dataset download and documentation](https://sites.google.com/site/yangdingqi/home/foursquare-dataset)
