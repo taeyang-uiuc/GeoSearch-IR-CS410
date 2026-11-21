@@ -1,0 +1,179 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R 10 0 R 12 0 R] /Count 4 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Length 777 >>
+stream
+0.07 0.25 0.45 rg 0 0 612 792 re f
+0.15 0.45 0.72 rg 0 0 612 13 re f
+BT /F2 12 Tf 0.80 0.90 1 rg 1 0 0 1 60 700 Tm (CS 410 - Fall 2026) Tj ET
+BT /F2 34 Tf 1 1 1 rg 1 0 0 1 60 615 Tm (GeoSearch-IR) Tj ET
+BT /F1 20 Tf 0.85 0.92 1 rg 1 0 0 1 60 578 Tm (Project Progress Report) Tj ET
+0.15 0.45 0.72 rg 60 548 180 3 re f
+BT /F2 15 Tf 1 1 1 rg 1 0 0 1 60 475 Tm (A Hybrid Spatio-Textual Search Engine) Tj ET
+BT /F2 15 Tf 1 1 1 rg 1 0 0 1 60 452 Tm (for Point-of-Interest Retrieval) Tj ET
+BT /F1 11 Tf 0.85 0.92 1 rg 1 0 0 1 60 360 Tm (Prepared for the project progress-report submission) Tj ET
+BT /F1 10 Tf 0.85 0.92 1 rg 1 0 0 1 60 125 Tm (November 21, 2026) Tj ET
+BT /F1 10 Tf 0.85 0.92 1 rg 1 0 0 1 60 98 Tm (Taeyang Song | Isaac Simms | Suman Mookherjee | Swarvanu Sanyal) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 4542 >>
+stream
+0.07 0.25 0.45 rg 0 756 612 36 re f
+BT /F2 10 Tf 1 1 1 rg 1 0 0 1 60 770 Tm (GeoSearch-IR | CS 410 Fall 2026) Tj ET
+BT /F2 14 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 720 Tm (Project status) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 698 Tm (The project has completed its high-level system design and team work allocation. The) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 684 Tm (documented system targets restaurant point-of-interest retrieval by combining a) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 670 Tm (geographic candidate filter, Lucene BM25 text retrieval, and a final distance-based) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 656 Tm (reranking step. The current repository evidence supports a design-stage progress report:) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 642 Tm (the algorithm and component interfaces have been specified, while the full index) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 628 Tm (construction, end-to-end search execution, and evaluation remain in progress.) Tj ET
+BT /F2 14 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 607 Tm (Progress made thus far) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 585 Tm (The team documented a complete retrieval sequence for a user query containing text plus) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 571 Tm (current latitude and longitude. An R-tree identifies restaurant records within a 25-mile) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 557 Tm (search radius. The eligible restaurant identifiers are supplied to Lucene as a docID) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 543 Tm (filter, so BM25 ranks only restaurants in the spatial candidate set. The system then) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 529 Tm (applies a spatial distance-decay function to rerank the BM25 results and returns the top) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 515 Tm (two restaurants with their names and addresses.) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 494 Tm (The design resolves the key integration question of how to apply a precomputed spatial) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 480 Tm (result before BM25 scoring. The repository includes a Pyserini/Lucene sample that builds) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 466 Tm (a TermInSetQuery over allowed restaurant IDs and places it in a BooleanQuery FILTER) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 452 Tm (clause alongside the BM25 query. This is the planned bridge between the spatial index) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 438 Tm (and the text-ranking component.) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 417 Tm (The data-preparation plan has also been documented. The intended searchable record keeps) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 403 Tm (an identifier, restaurant name, address, latitude, longitude, and an aggregated) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 389 Tm (attributes field. Relevant restaurant attributes and review text will be denormalized) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 375 Tm (into the attributes field before Lucene indexing.) Tj ET
+BT /F2 14 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 354 Tm (Team progress and responsibilities) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 332 Tm (Swarvanu Sanyal is responsible for initial data preparation, the R-tree spatial index,) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 318 Tm (and the spatial distance-decay reranking function. Suman Mookherjee is responsible for) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 304 Tm (the Lucene BM25 index and BM25 query method. Taeyang Song is responsible for integrating) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 290 Tm (the spatial filter, BM25 retrieval, and distance-based reranking into the end-to-end) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 276 Tm (query pipeline. Isaac Simms is responsible for evaluation-dataset preparation and) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 262 Tm (retrieval evaluation. All members will jointly tune the algorithm, resolve integration) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 248 Tm (issues, and prepare the final report.) Tj ET
+BT /F2 14 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 227 Tm (Repository evidence reviewed) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 205 Tm (The report is based on the current project README and algorithm/work-distribution) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 191 Tm (document in the project repository. These materials contain the high-level algorithm,) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 177 Tm (the Lucene docID-filter example, data-preparation plan, evaluation plan, and named team) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 163 Tm (responsibilities.) Tj ET
+BT /F1 8 Tf 0.36 0.43 0.50 rg 1 0 0 1 500 28 Tm (Page 2 of 4) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Length 4515 >>
+stream
+0.07 0.25 0.45 rg 0 756 612 36 re f
+BT /F2 10 Tf 1 1 1 rg 1 0 0 1 60 770 Tm (GeoSearch-IR | CS 410 Fall 2026) Tj ET
+BT /F2 14 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 720 Tm (Remaining tasks) Tj ET
+BT /F2 10 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 698 Tm (1.) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 698 Tm (Data and indexes) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 677 Tm (Prepare and validate the final restaurant dataset. Extract the selected attributes,) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 663 Tm (convert coded values such as price ranges into readable values, construct the six-field) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 649 Tm (JSON representation, build the Lucene index, and build the R-tree over restaurant) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 635 Tm (coordinates.) Tj ET
+BT /F2 10 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 614 Tm (2.) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 614 Tm (End-to-end query pipeline) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 593 Tm (Implement and test the complete query flow: receive a text query and user coordinates,) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 579 Tm (retrieve candidates within the selected radius, translate candidate restaurant IDs into) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 565 Tm (Lucene filter IDs, run filtered BM25 search, compute distances, apply the distance-decay) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 551 Tm (reranking function, and return ranked restaurant details.) Tj ET
+BT /F2 10 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 530 Tm (3.) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 530 Tm (Evaluation data and metrics) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 509 Tm (Create approximately 25 realistic spatio-textual queries, or a smaller justified set if) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 495 Tm (needed. Create relevance judgments for returned restaurant results, run the documented) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 481 Tm (queries through the completed system, and compute MAP and NDCG@K. The team will also) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 467 Tm (compare the hybrid approach with text-only and distance-only baselines and measure query) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 453 Tm (latency.) Tj ET
+BT /F2 10 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 432 Tm (4.) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 432 Tm (Integration and tuning) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 411 Tm (Test component interfaces, select and tune the geographic radius, BM25 candidate depth,) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 397 Tm (spatial-decay parameters, and final ranking behavior. Prepare reproducible execution) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 74 383 Tm (instructions and the final presentation.) Tj ET
+BT /F2 14 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 362 Tm (Challenges and issues) Tj ET
+BT /F2 8 Tf 0.36 0.43 0.50 rg 1 0 0 1 60 340 Tm (IDENTIFIER CONSISTENCY) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 328 Tm (The spatial index returns restaurant identifiers while Lucene maintains indexed document) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 314 Tm (identifiers. The implementation must preserve a reliable mapping from the dataset) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 300 Tm (identifier to the Lucene field used in the TermInSetQuery filter. A mismatch would) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 286 Tm (exclude valid candidates or apply scores to the wrong records.) Tj ET
+BT /F2 8 Tf 0.36 0.43 0.50 rg 1 0 0 1 60 265 Tm (HYBRID-SCORE BEHAVIOR) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 253 Tm (Text relevance and spatial proximity can conflict. The team must choose and test a) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 239 Tm (distance-decay function and its weight so that a nearby restaurant is favored) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 225 Tm (appropriately without overwhelming a strong textual match.) Tj ET
+BT /F2 8 Tf 0.36 0.43 0.50 rg 1 0 0 1 60 204 Tm (DATASET ALIGNMENT) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 192 Tm (The original proposal identifies the Foursquare NYC Restaurant Rich Dataset. The current) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 178 Tm (design document describes attributes such as star ratings, restaurant property maps, and) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 164 Tm (review text. The team must confirm the final source dataset and schema before indexing,) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 150 Tm (because this decision affects the preprocessing pipeline, geographic scope, evaluation) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 136 Tm (queries, and report claims.) Tj ET
+BT /F1 8 Tf 0.36 0.43 0.50 rg 1 0 0 1 500 28 Tm (Page 3 of 4) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 9 0 R >>
+endobj
+11 0 obj
+<< /Length 1875 >>
+stream
+0.07 0.25 0.45 rg 0 756 612 36 re f
+BT /F2 10 Tf 1 1 1 rg 1 0 0 1 60 770 Tm (GeoSearch-IR | CS 410 Fall 2026) Tj ET
+BT /F2 8 Tf 0.36 0.43 0.50 rg 1 0 0 1 60 720 Tm (EVALUATION JUDGMENTS) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 708 Tm (No pre-existing relevance judgments are available. The team must create consistent) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 694 Tm (relevance labels, maintain a shared judging rubric, and avoid using unverified LLM) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 680 Tm (output as ground truth.) Tj ET
+BT /F2 14 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 659 Tm (Next milestone) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 637 Tm (The immediate next milestone is a small vertical prototype that indexes a validated) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 623 Tm (sample of restaurants, executes one filtered BM25 query through the R-tree and Lucene) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 609 Tm (interface, reranks the results by distance, and outputs the top two restaurant records.) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 595 Tm (This will validate the planned architecture before the team scales to the full dataset) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 581 Tm (and evaluation set.) Tj ET
+BT /F2 14 Tf 0.07 0.25 0.45 rg 1 0 0 1 60 560 Tm (References) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 538 Tm (Project repository: https://github.com/taeyang-uiuc/GeoSearch-IR-CS410) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 517 Tm (Algorithm and work distribution:) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 503 Tm (https://github.com/taeyang-uiuc/GeoSearch-IR-CS410/blob/main/algo_and_work_distribution.md) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 482 Tm (Dataset cited in original proposal:) Tj ET
+BT /F1 10 Tf 0 0 0 rg 1 0 0 1 60 468 Tm (https://sites.google.com/site/yangdingqi/home/foursquare-dataset) Tj ET
+BT /F1 8 Tf 0.36 0.43 0.50 rg 1 0 0 1 500 28 Tm (Page 4 of 4) Tj ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 11 0 R >>
+endobj
+xref
+0 13
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000141 00000 n 
+0000000211 00000 n 
+0000000286 00000 n 
+0000001114 00000 n 
+0000001250 00000 n 
+0000005844 00000 n 
+0000005980 00000 n 
+0000010547 00000 n 
+0000010684 00000 n 
+0000012612 00000 n 
+trailer
+<< /Size 13 /Root 1 0 R >>
+startxref
+12750
+%%EOF

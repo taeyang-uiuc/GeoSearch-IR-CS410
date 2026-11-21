@@ -12,38 +12,49 @@ GeoSearch-IR is a planned search engine for finding New York City restaurants th
 - Suman Mookherjee (`sumanm2`)
 - Swarvanu Sanyal (`ssanyal4`)
 
-## Planned roles and deliverables
+## Team work division
 
-Role assignments are pending. Member numbers refer to the four workstreams below.
+### Swarvanu Sanyal (`ssanyal4`) — Data, spatial indexing, and ranking direction
 
-### Member 1 — Integration and hybrid ranking
+- Prepare the initial restaurant data for indexing.
+- Implement the R-tree spatial index over restaurant coordinates.
+- Define the distance-decay ranking function that reranks BM25-retrieved documents.
+- Set the project's overall technical direction.
 
-- Agree on integration milestones, venue IDs, query inputs, and ranked-run formats with the team.
-- Combine normalized BM25 scores with distance decay, expose the ranking weight and decay scale, and integrate the text and spatial components into top-k search.
-- Run end-to-end smoke tests and coordinate the final demo and submission.
-- **Handoff.** Provide a runnable hybrid search mode and ranked-run output for evaluation.
+### Suman Mookherjee (`sumanm2`) — BM25 indexing and text retrieval
 
-### Member 2 — Dataset preparation and BM25 retrieval
+- Prepare the BM25 index over restaurant documents.
+- Implement the method that queries documents through the BM25 index.
 
-- Inspect the Foursquare files, group and clean tips by venue ID, and join venue metadata and coordinates. Report how many venues have usable text and coordinates and record any exclusions.
-- Build the BM25 index over venue documents and implement the text-only baseline. Expose BM25 scores for venue IDs passed by the hybrid ranker.
-- **Handoff.** Provide the reproducible preprocessing and BM25 indexing commands, the shared venue schema, and the text-only run output.
+### Taeyang Song (`taeyang4`) — End-to-end hybrid query pipeline
 
-### Member 3 — Spatial indexing and distance retrieval
+- Implement the complete query mechanism.
+- Apply spatial filtering first, then BM25 retrieval over the filtered restaurant documents.
+- Rerank the filtered BM25 results with Swarvanu's spatial distance-decay function.
 
-- Compare H3 and S2 for candidate lookup and implement the selected index over the shared venue corpus.
-- Retrieve candidates from cells that cover the search area, compute great-circle distances, and apply exact radius filtering when a radius is specified. Test queries near cell and radius boundaries.
-- Implement the distance-only baseline against the same venue corpus used by the other runs.
-- **Handoff.** Provide the candidate lookup interface, distance scores for the hybrid ranker, and the distance-only run output.
+### Isaac Simms (`isimms2`) — Evaluation data and evaluation
 
-### Member 4 — Relevance judgments and benchmarking
+- Prepare the evaluation dataset.
+- Evaluate the retrieval results using the agreed measures.
 
-- Lead the creation of about 25 geo-keyword topics and pool the top results from all three runs. Deduplicate by venue ID and define the grading rubric.
-- Split judging across all four teammates, coordinate a shared calibration round, and consolidate grades into qrels.
-- Compute MAP and NDCG@K against the shared qrels. Benchmark end-to-end latency under the same conditions for all three modes and report median and 95th-percentile latency.
-- **Handoff.** Provide the topics, qrels, evaluation commands, and results for the final report and presentation.
+All teammates will fine-tune the algorithm, fix integration issues, and prepare the final report.
 
-All four teammates will review integration changes, judge a share of the pooled results, and contribute to the report and presentation.
+## Hybrid query integration
+
+Taeyang's integration module is implemented in [`src/search/hybrid_search.py`](src/search/hybrid_search.py). It accepts a spatial candidate provider and a filtered BM25 search function, then performs the following steps.
+
+1. Validates the query, coordinates, radius, and ranking weights.
+2. Applies an exact great-circle radius check to R-tree candidates.
+3. Sends the eligible `business_id` values to the BM25 component as an allowed-ID set.
+4. Normalizes BM25 scores, applies a distance-decay score, and returns deterministic top-k results with names, addresses, distances, and component scores.
+
+[`src/search/adapters.py`](src/search/adapters.py) connects the module to the R-tree helper and provides a Pyserini adapter for Lucene filtering through a `TermInSetQuery` on the `business_id` field. The Lucene index must retain `business_id` as a stored, searchable identifier field.
+
+Run the integration tests with:
+
+```bash
+/opt/homebrew/bin/python3 -m unittest discover -s tests -v
+```
 
 ## Dataset
 
@@ -145,15 +156,9 @@ Output: `src/resources/restaurant_reviews.kml`
 
 ## Course submissions
 
-- **Progress report** — pending
+- **Progress report** — [PDF](output/pdf/GeoSearch-IR_Progress_Report.pdf)
 - **Project code and documentation** — submission link pending
 - **Project presentation** — submission link pending
 
 `#SpatioTextualSearch` `#GeoAwareRanking` `#SpatialIndexing` `#POIRetrieval` `#HybridSearch`
-
-
-Currently we decided to use huggingface data looks more like what we need. It has restaurant attributes as well as some review. It is parquet file.
-   https://huggingface.co/datasets/yav1327/restaurant_reviews. 13.1k rows
-4. 
-4. 
 
