@@ -27,9 +27,33 @@ so we have 6 cols. id, name, address, lat, lon and attributes (all attributes sm
 
 ## Query
 
-- when user enters query, we first query spatial index (rtree) to find restaurant ids within 25 mile radius. Assume user gives restuarants of his choice and his lat/lon (curent position)
-- query the restaurant csv attributes field to get the text description of the restaurants. 
+- when user enters query, we first query spatial index (rtree) to find restaurant ids within 25 mile radius. Assume user gives restuarants of his choice and his lat/lon (curent position). Returns set of docid within that spatial scope. 
+- set this as a docid filter while doing lucene search.  
 - search in bm25 index to find the best 5 fits according to user query as a ranked list
+
+from pyserini.pyclass import autoclass
+
+def search_with_docid_filter(searcher, query_str, allowed_docids: set, top_k=10):
+    BooleanQuery = autoclass('org.apache.lucene.search.BooleanQuery$Builder')
+    TermInSetQuery = autoclass('org.apache.lucene.search.TermInSetQuery')
+    BooleanClause = autoclass('org.apache.lucene.search.BooleanClause')
+    BytesRef = autoclass('org.apache.lucene.util.BytesRef')
+
+    # Build the docid filter
+    bytes_list = [BytesRef(docid.encode()) for docid in allowed_docids]
+    docid_filter = TermInSetQuery("id", bytes_list)
+
+    # BM25 query
+    bm25_query = searcher.object.buildQuery(query_str)
+
+    builder = BooleanQuery()
+    builder.add(bm25_query, BooleanClause.Occur.valueOf("MUST"))
+    builder.add(docid_filter, BooleanClause.Occur.valueOf("FILTER"))
+
+    hits = searcher.object.search(builder.build(), top_k)
+    return [(hit.docid, hit.score) for hit in hits]
+
+
 - now we define a ranking function that will modify the rank of the restaurant based on distance from user's current location
 - Recommend top 2 restaurants to the user. Give their name and address by looking it up in the csv. 
 
