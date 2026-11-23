@@ -45,10 +45,19 @@ Taeyang's integration module is implemented in [`src/search/hybrid_search.py`](s
 
 1. Validates the query, coordinates, radius, and ranking weights.
 2. Applies an exact great-circle radius check to R-tree candidates.
-3. Sends the eligible `business_id` values to the BM25 component as an allowed-ID set.
+3. Sends the eligible restaurant IDs to the BM25 component as an allowed-ID set.
 4. Normalizes BM25 scores, applies a distance-decay score, and returns deterministic top-k results with names, addresses, distances, and component scores.
 
-[`src/search/adapters.py`](src/search/adapters.py) connects the module to the R-tree helper and provides a Pyserini adapter for Lucene filtering through a `TermInSetQuery` on the `business_id` field. The Lucene index must retain `business_id` as a stored, searchable identifier field.
+[`src/search/adapters.py`](src/search/adapters.py) connects the module to the R-tree helper, enriches spatial candidates from the prepared JSONL metadata, and provides a Pyserini adapter for Lucene filtering through a `TermInSetQuery` on the JSONL `id` field.
+
+After the Lucene index is built, run an end-to-end query with:
+
+```bash
+python -m src.scripts.run_hybrid_query \
+  --lucene-index data/lucene-index \
+  --query "quiet restaurant with outdoor seating" \
+  --latitude 36.12 --longitude -115.17
+```
 
 Run the integration tests with:
 
