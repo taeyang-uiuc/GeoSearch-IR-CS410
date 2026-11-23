@@ -1,5 +1,9 @@
 import unittest
+import json
+import tempfile
+from pathlib import Path
 
+from src.search.adapters import load_jsonl_metadata
 from src.search.hybrid_search import BM25Hit, exponential_distance_decay, search_restaurants
 
 
@@ -77,6 +81,24 @@ class HybridSearchTests(unittest.TestCase):
         )
 
         self.assertEqual(results, [])
+
+    def test_loads_prepared_jsonl_fields_for_result_metadata(self):
+        document = {
+            "id": "restaurant-1",
+            "contents": "quiet cafe with outdoor seating",
+            "name": "Test Cafe",
+            "address": "1 Main St",
+            "lat": 40.1,
+            "lon": -88.2,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            jsonl_path = Path(directory) / "restaurants.jsonl"
+            jsonl_path.write_text(json.dumps(document) + "\n", encoding="utf-8")
+            metadata = load_jsonl_metadata(jsonl_path)
+
+        self.assertEqual(metadata["restaurant-1"]["business_id"], "restaurant-1")
+        self.assertEqual(metadata["restaurant-1"]["name"], "Test Cafe")
+        self.assertEqual(metadata["restaurant-1"]["latitude"], 40.1)
 
 
 if __name__ == "__main__":
