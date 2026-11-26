@@ -1,36 +1,20 @@
-"""
-bm25_search.py
-Build a Pyserini BM25 index from restaurants.jsonl (fields: id, contents, name, address, lat, lon)
-and search it interactively.
+"""Build and query a Lucene BM25 index over the prepared restaurant JSONL."""
 
-Usage:
-    conda activate pyserini
-    python bm25_search.py                       # uses restaurants.jsonl
-    python bm25_search.py path/to/file.jsonl    # custom input
-    python bm25_search.py --rebuild             # force re-indexing
-"""
-import os
-import sys
+import argparse
 import json
-import shutil
+import os
+from pathlib import Path
 import subprocess
+import sys
+from tempfile import TemporaryDirectory
 
-# pyserini builds an OpenAI client at import time; a dummy key avoids the error
-os.environ.setdefault("OPENAI_API_KEY", "dummy")
-os.environ["JAVA_HOME"] = "/opt/anaconda3/envs/pyserini/lib/jvm"
-os.environ["JVM_PATH"] = "/opt/anaconda3/envs/pyserini/lib/jvm/lib/server/libjvm.dylib"
 
-from pyserini.search.lucene import LuceneSearcher
-from jnius import autoclass
-
-# ---------------- settings ----------------
-BASE_DIR   = "/Users/swsanyal/codebases/GeoSearch-IR-CS410"
-INPUT_FILE = os.path.join(BASE_DIR, "data", "restaurants.jsonl")
-WORK_DIR   = os.path.join(BASE_DIR, "geosearch_work")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+INPUT_FILE = REPO_ROOT / "data/restaurants.jsonl"
+WORK_DIR = REPO_ROOT / "geosearch_work"
 TOP_K = 10
 BM25_K1, BM25_B = 0.9, 0.4
 SNIPPET_CHARS = 160
-# ------------------------------------------
 
 
 def clean_text(text):
@@ -38,40 +22,60 @@ def clean_text(text):
     return " ".join(str(text).replace("\\n", " ").split())
 
 
-def build_index(input_file):
-    """Write a cleaned JsonCollection (id + contents) and run the Lucene indexer."""
-    docs_dir = os.path.join(WORK_DIR, "docs")
-    index_dir = os.path.join(WORK_DIR, "index")
-    shutil.rmtree(WORK_DIR, ignore_errors=True)
-    os.makedirs(docs_dir)
+def build_index(input_file, work_dir=WORK_DIR, *, rebuild=False):
+    """Clean the JSONL and build the index before replacing any existing one."""
+    work_dir = Path(work_dir).resolve()
+    index_dir = work_dir / "index"
+    if index_dir.exists() and not rebuild:
+        raise FileExistsError(f"{index_dir} already exists. Use --rebuild to replace it.")
+    work_dir.mkdir(parents=True, exist_ok=True)
 
-    n = 0
-    with open(input_file, encoding="utf-8") as f, \
-         open(os.path.join(docs_dir, "docs.jsonl"), "w", encoding="utf-8") as out:
-        for line in f:
-            if not line.strip():
-                continue
-            rec = json.loads(line)
-            contents = clean_text(rec.get("contents", ""))
-            if not contents:
-                continue
-            out.write(json.dumps({"id": str(rec["id"]), "contents": contents}) + "\n")
-            n += 1
+    with TemporaryDirectory(prefix="build-", dir=work_dir) as staging:
+        staging = Path(staging)
+        docs_dir = staging / "docs"
+        docs_dir.mkdir()
+        pending_index = staging / "index"
+        count = 0
+        with open(input_file, encoding="utf-8") as source, (docs_dir / "docs.jsonl").open(
+            "w", encoding="utf-8"
+        ) as output:
+            for line in source:
+                if not line.strip():
+                    continue
+                record = json.loads(line)
+                contents = clean_text(record.get("contents", ""))
+                if contents:
+                    output.write(json.dumps({"id": str(record["id"]), "contents": contents}) + "\n")
+                    count += 1
 
-    print(f"Indexing {n} documents ...")
-    run = subprocess.run(
-        [sys.executable, "-m", "pyserini.index.lucene",
-         "--collection", "JsonCollection",
-         "--input", docs_dir,
-         "--index", index_dir,
-         "--generator", "DefaultLuceneDocumentGenerator",
-         "--threads", "1",
-         "--storePositions", "--storeDocvectors", "--storeRaw"],
-        capture_output=True, text=True)
-    if run.returncode != 0:
-        raise RuntimeError("Indexing failed:\n" + (run.stderr or run.stdout)[-2000:])
-    print("Index built at", index_dir)
-    return index_dir
+        if not count:
+            raise ValueError(f"No indexable documents found in {input_file}.")
+        print(f"Indexing {count} documents ...", flush=True)
+        subprocess.run(
+            [
+                sys.executable, "-m", "pyserini.index.lucene",
+                "--collection", "JsonCollection",
+                "--input", str(docs_dir),
+                "--index", str(pending_index),
+                "--generator", "DefaultLuceneDocumentGenerator",
+                "--threads", "1",
+                "--storePositions", "--storeDocvectors", "--storeRaw",
+            ],
+            check=True,
+        )
+
+        previous_index = staging / "previous-index"
+        if rebuild and index_dir.exists():
+            index_dir.rename(previous_index)
+        try:
+            pending_index.rename(index_dir)
+        except OSError:
+            if previous_index.exists():
+                previous_index.rename(index_dir)
+            raise
+
+    print(f"Index built at {index_dir}")
+    return str(index_dir)
 
 
 def load_metadata(input_file):
@@ -91,96 +95,108 @@ def load_metadata(input_file):
     return meta
 
 
-def bm25_search(
-    meta: dict,
-    index_dir: str,
-    query: str,
-    top_k: int = TOP_K,
-    allowed_ids: set | None = None,
-) -> list[dict]:
-    """Search the Lucene index and return ranked results.
+def open_searcher(index_dir):
+    """Open a searcher using the same BM25 settings for both retrieval modes."""
+    # Some Pyserini versions initialize an OpenAI client during import.
+    os.environ.setdefault("OPENAI_API_KEY", "unused-by-local-bm25")
+    from pyserini.search.lucene import LuceneSearcher
 
-    Args:
-        meta:        id -> {name, address, lat, lon, contents} from load_metadata()
-        index_dir:   path to the Lucene index directory
-        query:       search query string
-        top_k:       number of results to return
-        allowed_ids: optional set of doc IDs to restrict search to
-
-    Returns:
-        List of dicts with keys: id, score, name, address, lat, lon, snippet
-    """
-    searcher = LuceneSearcher(index_dir)
+    searcher = LuceneSearcher(str(index_dir))
     searcher.set_bm25(k1=BM25_K1, b=BM25_B)
+    return searcher
 
-    if allowed_ids is not None:
-        BooleanQuery = autoclass("org.apache.lucene.search.BooleanQuery$Builder")
-        TermInSetQuery = autoclass("org.apache.lucene.search.TermInSetQuery")
-        Occur = autoclass("org.apache.lucene.search.BooleanClause$Occur")
-        BytesRef = autoclass("org.apache.lucene.util.BytesRef")
-        QueryParser = autoclass("org.apache.lucene.queryparser.classic.QueryParser")
 
-        ArrayList = autoclass("java.util.ArrayList")
-        bytes_list = ArrayList()
-        for docid in allowed_ids:
-            bytes_list.add(BytesRef(docid.encode()))
-        docid_filter = TermInSetQuery("id", bytes_list)
+def search_hits(searcher, query, top_k, allowed_ids=None):
+    """Return Lucene hits, optionally restricting by external document ID."""
+    if allowed_ids is None:
+        return searcher.search(query, top_k)
+    if not allowed_ids:
+        return []
 
-        parser = QueryParser("contents", searcher.object.analyzer)
-        bm25_query = parser.parse(QueryParser.escape(query))
+    from jnius import autoclass
 
-        builder = BooleanQuery()
-        builder.add(bm25_query, Occur.MUST)
-        builder.add(docid_filter, Occur.FILTER)
-        raw_hits = searcher.object.search(builder.build(), top_k)
-    else:
-        raw_hits = searcher.search(query, top_k)
+    array_list = autoclass("java.util.ArrayList")
+    bytes_ref = autoclass("org.apache.lucene.util.BytesRef")
+    term_in_set = autoclass("org.apache.lucene.search.TermInSetQuery")
+    occur = autoclass("org.apache.lucene.search.BooleanClause$Occur")
+    builder = autoclass("org.apache.lucene.search.BooleanQuery$Builder")()
+    query_generator = autoclass("io.anserini.search.query.BagOfWordsQueryGenerator")()
 
+    terms = array_list()
+    for restaurant_id in sorted(allowed_ids):
+        terms.add(bytes_ref(restaurant_id.encode("utf-8")))
+    text_query = query_generator.buildQuery("contents", searcher.object.get_analyzer(), query)
+    builder.add(text_query, occur.MUST)
+    builder.add(term_in_set("id", terms), occur.FILTER)
+    return searcher.search(builder.build(), top_k)
+
+
+def bm25_search(meta, index_dir, query, top_k=TOP_K, allowed_ids=None):
+    """Return ranked results with restaurant metadata for the text-only demo."""
+    searcher = open_searcher(index_dir)
+    try:
+        return _format_hits(meta, search_hits(searcher, query, top_k, allowed_ids))
+    finally:
+        searcher.close()
+
+
+def _format_hits(meta, hits):
     results = []
-    for h in raw_hits:
-        m = meta.get(h.docid, {})
+    for hit in hits:
+        record = meta.get(hit.docid, {})
         results.append({
-            "id": h.docid,
-            "score": h.score,
-            "name": m.get("name", ""),
-            "address": m.get("address", ""),
-            "lat": m.get("lat"),
-            "lon": m.get("lon"),
-            "snippet": m.get("contents", "")[:SNIPPET_CHARS],
+            "id": hit.docid,
+            "score": float(hit.score),
+            "name": record.get("name", ""),
+            "address": record.get("address", ""),
+            "lat": record.get("lat"),
+            "lon": record.get("lon"),
+            "snippet": record.get("contents", "")[:SNIPPET_CHARS],
         })
     return results
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    input_file = args[0] if args else INPUT_FILE
-    rebuild = "--rebuild" in sys.argv
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("input_file", nargs="?", type=Path, default=INPUT_FILE)
+    parser.add_argument("--work-dir", type=Path, default=WORK_DIR)
+    parser.add_argument("--build-only", action="store_true")
+    parser.add_argument("--rebuild", action="store_true")
+    args = parser.parse_args()
 
-    index_dir = os.path.join(WORK_DIR, "index")
-    if rebuild or not os.path.isdir(index_dir):
-        build_index(input_file)
+    index_dir = args.work_dir / "index"
+    if args.rebuild or not index_dir.is_dir():
+        build_index(args.input_file, args.work_dir, rebuild=args.rebuild)
     else:
         print(f"Using existing index at {index_dir} (use --rebuild to re-index).")
 
-    meta = load_metadata(input_file)
-    print(f"Ready: {len(meta)} documents. BM25 k1={BM25_K1}, b={BM25_B}")
+    if args.build_only:
+        return
 
-    while True:
-        query = input("\nSearch (or 'exit'): ").strip()
-        if query.lower() == "exit":
-            break
-        if not query:
-            continue
+    meta = load_metadata(args.input_file)
+    searcher = open_searcher(index_dir)
+    try:
+        print(f"Ready: {len(meta)} documents. BM25 k1={BM25_K1}, b={BM25_B}")
+        while True:
+            try:
+                query = input("\nSearch (or 'exit'): ").strip()
+            except EOFError:
+                break
+            if query.lower() == "exit":
+                break
+            if not query:
+                continue
 
-        nearby_ids = {"G58YATMKnn-M-RUDWg3lxw", "vPTkG6k_ZzLakPp4s-gQJQ"}
-        results = bm25_search(meta, index_dir, query, allowed_ids=nearby_ids)
-        if not results:
-            print("No results.")
-            continue
-        for rank, r in enumerate(results, 1):
-            print(f"\n{rank:2d}. {r['name']}   [id={r['id']}  score={r['score']:.3f}]")
-            print(f"    {r['address']}   ({r['lat']}, {r['lon']})")
-            print(f"    {r['snippet']}...")
+            results = _format_hits(meta, search_hits(searcher, query, TOP_K))
+            if not results:
+                print("No results.")
+                continue
+            for rank, result in enumerate(results, 1):
+                print(f"\n{rank:2d}. {result['name']}   [id={result['id']}  score={result['score']:.3f}]")
+                print(f"    {result['address']}   ({result['lat']}, {result['lon']})")
+                print(f"    {result['snippet']}...")
+    finally:
+        searcher.close()
 
 
 if __name__ == "__main__":

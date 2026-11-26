@@ -62,56 +62,25 @@ def rtree_candidate_provider(
         enriched_records: list[dict[str, object]] = []
         for record in records:
             restaurant_id = str(record["business_id"])
-            enriched = dict(record)
-            enriched.update(metadata_by_id.get(restaurant_id, {}))
-            enriched_records.append(enriched)
+            metadata = metadata_by_id.get(restaurant_id)
+            if metadata is not None:
+                enriched_records.append({**record, **metadata})
         return enriched_records
 
     return candidates
 
 
 def pyserini_filtered_bm25_search(searcher) -> FilteredBM25Searcher:
-    """Adapt a Pyserini LuceneSearcher to filtered BM25 retrieval.
+    """Adapt the team's BM25 results to the hybrid ranker's hit format."""
 
-    The prepared JSONL uses ``id`` for the restaurant identifier and
-    ``contents`` for indexed text. Pyserini retains ``id`` as the external
-    document identifier used by this filter and by returned hits.
-    """
+    from src.text.bm25_search import search_hits
 
-    return _pyserini_searcher(searcher, id_field="id")
-
-
-def _pyserini_searcher(searcher, *, id_field: str) -> FilteredBM25Searcher:
     def search(
         query: str,
         allowed_ids: set[str],
         top_k: int,
     ) -> list[BM25Hit]:
-        if not allowed_ids:
-            return []
-
-        try:
-            from pyserini.pyclass import autoclass
-        except ImportError as error:
-            raise RuntimeError(
-                "Pyserini is required for Lucene filtered retrieval. "
-                "Install it after the BM25 index is available."
-            ) from error
-
-        boolean_query = autoclass("org.apache.lucene.search.BooleanQuery$Builder")
-        term_in_set_query = autoclass("org.apache.lucene.search.TermInSetQuery")
-        boolean_clause = autoclass("org.apache.lucene.search.BooleanClause")
-        bytes_ref = autoclass("org.apache.lucene.util.BytesRef")
-
-        identifier_terms = [bytes_ref(value.encode()) for value in sorted(allowed_ids)]
-        identifier_filter = term_in_set_query(id_field, identifier_terms)
-        text_query = searcher.object.buildQuery(query)
-
-        builder = boolean_query()
-        builder.add(text_query, boolean_clause.Occur.valueOf("MUST"))
-        builder.add(identifier_filter, boolean_clause.Occur.valueOf("FILTER"))
-
-        hits = searcher.object.search(builder.build(), top_k)
+        hits = search_hits(searcher, query, top_k, allowed_ids)
         return [BM25Hit(hit.docid, float(hit.score)) for hit in hits]
 
     return search

@@ -3,7 +3,7 @@
 **A Hybrid Spatio-Textual Search Engine for Point-of-Interest Retrieval**  
 CS 410 Term Project · Fall 2026
 
-GeoSearch-IR is a planned search engine for finding New York City restaurants that match both a keyword query and a location. For a request like “quiet café with outdoor seating near Union Square,” the engine will use restaurant tips to estimate textual relevance and geographic distance to favor nearby venues. The project will compare a hybrid ranker with text-only and distance-only baselines.
+GeoSearch-IR finds restaurants that match both a keyword query and a location. It uses restaurant descriptions and reviews for text retrieval, then considers distance from the query location when ranking the results. The planned evaluation compares hybrid search with text-only and distance-only baselines.
 
 ## Team
 
@@ -45,50 +45,52 @@ Taeyang's integration module is implemented in [`src/search/hybrid_search.py`](s
 
 1. Validates the query, coordinates, radius, and ranking weights.
 2. Applies an exact great-circle radius check to R-tree candidates.
-3. Sends the eligible restaurant IDs to the BM25 component as an allowed-ID set.
+3. Sends eligible restaurant IDs to the shared BM25 search function, which applies a Lucene filter on the indexed `id` field.
 4. Normalizes BM25 scores, applies a distance-decay score, and returns deterministic top-k results with names, addresses, distances, and component scores.
 
-[`src/search/adapters.py`](src/search/adapters.py) connects the module to the R-tree helper, enriches spatial candidates from the prepared JSONL metadata, and provides a Pyserini adapter for Lucene filtering through a `TermInSetQuery` on the JSONL `id` field.
-
-After the Lucene index is built, run an end-to-end query with:
+From the repository root, use Python 3.12 and Java 21. Set `JAVA_HOME` for your JDK if your environment does not already expose it. [Pyserini installation guide](https://github.com/castorini/pyserini#-installation)
 
 ```bash
+python -m pip install 'pyserini==1.2.0' pandas rtree geopy
+python -m src.text.bm25_search --build-only
 python -m src.scripts.run_hybrid_query \
-  --lucene-index data/lucene-index \
-  --query "quiet restaurant with outdoor seating" \
-  --latitude 36.12 --longitude -115.17
+  --query 'pizza' --latitude 36.12 --longitude -115.17
 ```
+
+The build writes `geosearch_work/index`. Use `--rebuild` on the build command after changing the corpus. For a custom index, pass `--lucene-index` to the query command and provide the matching `--jsonl` and `--csv` files. Run `python -m src.text.bm25_search` for interactive text-only search using the same index.
+
+The hybrid CLI writes a ranked JSON array. Each result includes the restaurant ID, name, address, distance in meters, raw BM25 score, spatial score, and final score. The array order gives the rank. For evaluation runs, set `--top-k` and `--candidate-limit` to the desired return and candidate depths, with the candidate depth at least as large as the return depth. A query with no eligible results returns `[]`.
 
 Run the integration tests with:
 
 ```bash
-/opt/homebrew/bin/python3 -m unittest discover -s tests -v
+python -m unittest discover -s tests -v
 ```
 
 ## Dataset
 
-The project uses Dingqi Yang’s **Foursquare NYC Restaurant Rich Dataset**. It covers October 24, 2011 through February 20, 2012 and contains 3,298 venues, 3,112 users, 27,149 check-ins, and 10,377 English-language tips, along with venue tags. Choose the **NYC Restaurant Rich Dataset (Check-ins, Tips, Tags)** entry for the archive and its schema notes. [Dataset download and documentation](https://sites.google.com/site/yangdingqi/home/foursquare-dataset)
+The current implementation uses the restaurant-review CSV at [`src/resources/restaurant_reviews.csv`](src/resources/restaurant_reviews.csv) and the prepared collection at [`data/restaurants.jsonl`](data/restaurants.jsonl). The prepared collection contains 13,144 restaurant IDs. It uses the CSV's `business_id` as the Lucene `id`, and combines reviews and restaurant attributes in `contents`.
 
-- **Retrieval unit.** Build one document per venue ID by grouping that venue’s tips. Join venue metadata and validate coordinates for spatial indexing. Record how many venues have usable text and coordinates after preprocessing.
-- **Text signal.** Index tip text with BM25. Tips can provide evidence about dishes, atmosphere, and amenities.
-- **Spatial signal.** Use validated venue latitude and longitude. Confirm coordinate coverage during ingestion and document how missing coordinates are handled. The experiment uses historical venue records and tips.
+To regenerate the prepared collection from the checked-in CSV, run:
 
-Dataset citation: Dingqi Yang, Daqing Zhang, Zhiyong Yu, and Zhiwen Yu. “Fine-Grained Preference-Aware Location Search Leveraging Crowdsourced Digital Footprints from LBSNs.” UbiComp 2013. [Paper](https://www-public.imtbs-tsp.eu/~zhang_da/pub/UbiComp_2013_Yang.pdf)
+```bash
+python -m src.scripts.prepare_lucene_docs --input src/resources --output data
+```
 
-## Planned search workflow
+## Search workflow
 
 ```mermaid
 flowchart TD
     subgraph Offline["Offline indexing"]
-        A["Foursquare restaurant data"] --> B["Group tips and validate venue coordinates"]
-        B --> T["BM25 text index"]
-        B --> S["Spatial index using H3 or S2"]
+        A["Restaurant review CSV"] --> B["Prepare Lucene JSONL"]
+        B --> T["Lucene BM25 text index"]
+        A --> S["R-tree spatial index"]
     end
 
     subgraph Online["Query-time retrieval"]
-        Q["Keywords and query coordinates"] --> C["Find nearby candidates using spatial cells"]
+        Q["Keywords and query coordinates"] --> C["Find R-tree candidates and check radius"]
         S --> C
-        C --> R["Score candidates with BM25 and geographic distance"]
+        C --> R["Run BM25 with eligible restaurant IDs"]
         T --> R
         Q --> R
         R --> H["Combine normalized BM25 and distance decay"]
@@ -96,13 +98,13 @@ flowchart TD
     end
 ```
 
-The spatial index will find candidate venues in cells covering the search area. The ranker will compute great-circle distance from the query coordinates to each candidate venue and apply a decay function so closer venues receive a higher spatial score. The planned hybrid score is a weighted sum of normalized BM25 and the distance-decay score. The spatial index, candidate radius, decay scale, and ranking weight are design choices to test.
+The R-tree narrows the spatial search, then the pipeline applies a great-circle distance check. Lucene restricts BM25 results to the eligible IDs before returning the top text candidates. The hybrid ranker combines normalized BM25 with exponential distance decay.
 
 ## Planned evaluation
 
 1. Write approximately 25 realistic queries. Each topic will specify keywords, a latitude and longitude, and a short description of the intended result.
 2. Run **BM25-only**, **distance-only**, and **hybrid** retrieval against a common venue corpus. Pool their top results for each query and deduplicate by venue ID.
-3. Grade each pooled query–venue pair using the topic description, available tip evidence, and geographic proximity. Use a proposed scale of **0** (irrelevant), **1** (partially relevant), and **2** (highly relevant). Record the grades as relevance judgments (qrels).
+3. Grade each pooled query–venue pair using the topic description, available review and attribute evidence, and geographic proximity. Use a proposed scale of **0** (irrelevant), **1** (partially relevant), and **2** (highly relevant). Record the grades as relevance judgments (qrels).
 4. Evaluate all runs against the same qrels. Use **MAP** for binary relevance with grades 1 and 2 counted as relevant, and **NDCG@K** for graded relevance near the top of the ranking. Record the pool depth and evaluation cutoff with the results.
 5. Measure end-to-end query latency over repeated runs on the same hardware. Report median and 95th-percentile latency for each approach.
 
@@ -123,10 +125,10 @@ flowchart LR
 
 ### Dependencies
 
-Activate your pyserini virtual environment, then install the geo dependencies:
+For the geographic utilities, install:
 
 ```bash
-pip install rtree geopy simplekml
+python -m pip install pandas rtree geopy simplekml
 ```
 
 ### Geo pipeline
@@ -170,4 +172,3 @@ Output: `src/resources/restaurant_reviews.kml`
 - **Project presentation** — submission link pending
 
 `#SpatioTextualSearch` `#GeoAwareRanking` `#SpatialIndexing` `#POIRetrieval` `#HybridSearch`
-
