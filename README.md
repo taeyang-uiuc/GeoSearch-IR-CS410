@@ -202,12 +202,13 @@ An invalid query parameter returns a JSON error with HTTP 400. Top K supports 1 
 
 - All restaurants appear as grey dots on load (canvas-rendered for performance)
 - Click anywhere on the map to set that position as your query location
-- Use **📍 My Location** to fill lat/lon from the browser's geolocation API
+- Use **My Location** to fill lat/lon from the browser's geolocation API
 - Search form accepts: query text, latitude, longitude, radius (miles), top-k
 - Results appear as red highlighted markers; a ranked sidebar shows name, distance, BM25/spatial/final scores
 - Clicking a sidebar card zooms the map to that restaurant and opens its popup
-- Popups show full restaurant details: stars, review count, cuisine label, price range, and attribute badges (takeout, outdoor seating, WiFi, alcohol, noise level, etc.)
-- **💾 Save State** captures the last completed query, coordinates, parameters, and results to `localStorage` for later reload
+- Map popups prioritize the restaurant name and address. Search-result popups show distance and BM25/spatial/final scores; other restaurant popups show rating and review count. Expand **Venue amenities** to inspect available attributes such as takeout, outdoor seating, Wi-Fi, alcohol, and noise level.
+- Ranked result cards show kid friendliness and outdoor seating as **Yes**, **No**, or **unknown**, based on the dataset.
+- **Save State** captures the last completed query, coordinates, parameters, and results to `localStorage` for later reload
 - Saved states capture the last completed search. Searches and saved-state loading wait for restaurant markers to load, and older search responses are ignored after a newer search starts.
 - Enter an optional saved-search name in the sidebar, then click Save State. Saving uses the page controls and works in browsers that disable JavaScript prompt dialogs.
 
