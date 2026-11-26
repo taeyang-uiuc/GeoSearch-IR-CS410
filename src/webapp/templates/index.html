@@ -117,6 +117,20 @@
     .result-card .rank, .result-card .scores { color: var(--accent); font-size: .79rem; font-weight: 700; }
     .result-card .name { font-weight: 700; }
     .result-card .meta { color: var(--muted); font-size: .86rem; }
+    .amenities { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+    .amenity { display: inline-block; padding: 3px 7px; border-radius: 6px; background: #e7f3eb; color: #19533d; font-size: .78rem; font-weight: 600; }
+    .amenity.no { background: #f7e9e5; color: #8b3c2b; }
+    .amenity.unknown { background: #edf0ef; color: #586a64; }
+    .amenity.detail { background: #edf2f8; color: #344f70; }
+    .venue-popup { min-width: 220px; max-width: 290px; color: #192c29; }
+    .venue-popup .popup-name { font-size: 1.08rem; line-height: 1.25; font-weight: 700; }
+    .venue-popup .popup-address { color: var(--muted); font-size: .84rem; margin: 3px 0 10px; }
+    .venue-popup .popup-metrics { display: grid; gap: 3px; padding: 8px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: .86rem; }
+    .venue-popup .popup-metrics strong { color: var(--accent); }
+    .venue-popup details { margin-top: 8px; font-size: .77rem; color: var(--muted); }
+    .venue-popup summary { cursor: pointer; font-weight: 700; }
+    .venue-popup .popup-amenities { max-height: 120px; overflow-y: auto; gap: 4px; margin-bottom: 0; }
+    .venue-popup .amenity { font-size: .72rem; padding: 2px 5px; }
 
     #saved-panel { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px; }
     #saved-panel .actions { margin: 8px 0 12px; }
@@ -221,6 +235,62 @@
   let searchVersion = 0;
   let lastSearchState = null;
 
+  const amenityFields = [
+    ['GoodForKids', 'Kid friendly'], ['OutdoorSeating', 'Outdoor seating'],
+    ['RestaurantsTakeOut', 'Takeout'], ['RestaurantsDelivery', 'Delivery'],
+    ['RestaurantsReservations', 'Reservations'], ['RestaurantsGoodForGroups', 'Groups'],
+    ['HasTV', 'TV'], ['HappyHour', 'Happy hour'], ['Caters', 'Catering'],
+    ['BikeParking', 'Bike parking'], ['WheelchairAccessible', 'Wheelchair access'],
+    ['DogsAllowed', 'Dogs allowed'], ['BusinessAcceptsCreditCards', 'Credit cards'],
+    ['Alcohol', 'Alcohol'], ['WiFi', 'Wi-Fi'], ['NoiseLevel', 'Noise level'],
+    ['RestaurantsAttire', 'Attire'], ['Smoking', 'Smoking']
+  ];
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
+  }
+
+  function amenityBadge(value, label) {
+    if (value == null || value === '') return `<span class="amenity unknown">${label}: unknown</span>`;
+    if (value === true || value === false) {
+      return `<span class="amenity ${value ? '' : 'no'}">${label}: ${value ? 'Yes' : 'No'}</span>`;
+    }
+    const clean = String(value).replace(/^u?['"]|['"]$/g, '');
+    return `<span class="amenity detail">${label}: ${escapeHtml(clean)}</span>`;
+  }
+
+  function amenitiesHtml(venue, all = false) {
+    const fields = all ? amenityFields.filter(([key], index) => index < 2 || venue[key] != null) : amenityFields.slice(0, 2);
+    return `<div class="amenities${all ? ' popup-amenities' : ''}">${fields.map(([key, label]) => amenityBadge(venue[key], label)).join('')}</div>`;
+  }
+
+  function resultPopup(venue, result, rank) {
+    return `<div class="venue-popup">
+      <div class="popup-name">#${rank} ${escapeHtml(venue.name)}</div>
+      <div class="popup-address">${escapeHtml(venue.address || '')}, ${escapeHtml(venue.city || '')}</div>
+      <div class="popup-metrics">
+        <div><strong>Distance:</strong> ${(result.distance_meters / 1000).toFixed(2)} km</div>
+        <div><strong>BM25:</strong> ${result.bm25_score.toFixed(3)} · <strong>Spatial:</strong> ${result.spatial_score.toFixed(3)}</div>
+        <div><strong>Final score:</strong> ${result.final_score.toFixed(3)}</div>
+      </div>
+      <details><summary>Venue amenities</summary>${amenitiesHtml(venue, true)}</details>
+    </div>`;
+  }
+
+  function resultCard(result, venue, rank) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'result-card';
+    card.innerHTML = `<span class="rank">#${rank}</span>
+      <div class="name">${escapeHtml(venue.name)}</div>
+      <div class="meta">${escapeHtml(venue.address || '')} · ${(result.distance_meters / 1000).toFixed(2)} km away</div>
+      ${amenitiesHtml(venue)}
+      <div class="scores">BM25: ${result.bm25_score.toFixed(3)} · Spatial: ${result.spatial_score.toFixed(3)} · Final: ${result.final_score.toFixed(3)}</div>`;
+    return card;
+  }
+
   // Load all restaurants once
   const restaurantsReady = fetch('/api/restaurants')
     .then(r => {
@@ -232,19 +302,12 @@
         restaurantLookup[r.business_id] = r;
         if (Number.isFinite(r.lat) && Number.isFinite(r.lon)) {
           const p = r;
-          const stars = p.stars ? '⭐'.repeat(Math.round(p.stars)) + ` ${p.stars}` : '';
-          const price = p.RestaurantsPriceRange2 ? '$'.repeat(parseInt(p.RestaurantsPriceRange2)) : '';
-          const badge = (v, label) => v == null ? '' : `<span style="background:#e8e8f0;color:#333;border-radius:3px;padding:1px 5px;margin:1px;display:inline-block;font-size:0.75em">${v === true ? '✓' : v === false ? '✗' : v} ${label}</span>`;
-          const popup = `
-            <b>${p.name}</b> ${price}<br>
-            <span style="color:#888">${p.address}, ${p.city}, ${p.state} ${p.postal_code||''}</span><br>
-            ${stars} &nbsp; <span style="color:#888">${p.review_count||0} reviews</span> &nbsp; ${p.is_open ? '<span style="color:green">Open</span>' : '<span style="color:red">Closed</span>'}<br>
-            <span style="color:#aaa;font-size:0.8em">${p.label||''}</span><br>
-            <div style="margin-top:4px;font-size:0.78em;line-height:1.8">
-              ${badge(p.RestaurantsTakeOut,'Takeout')}${badge(p.RestaurantsDelivery,'Delivery')}${badge(p.OutdoorSeating,'Outdoor')}${badge(p.RestaurantsReservations,'Reservations')}${badge(p.GoodForKids,'Kids OK')}${badge(p.RestaurantsGoodForGroups,'Groups')}${badge(p.HasTV,'TV')}${badge(p.HappyHour,'Happy Hour')}${badge(p.Caters,'Catering')}${badge(p.BikeParking,'Bike Parking')}${badge(p.WheelchairAccessible,'Accessible')}${badge(p.DogsAllowed,'Dogs OK')}
-              ${p.Alcohol && p.Alcohol!=='none' ? badge(p.Alcohol,'Alcohol') : ''}${badge(p.WiFi,'WiFi')}${badge(p.NoiseLevel,'Noise')}${badge(p.RestaurantsAttire,'Attire')}${badge(p.Smoking,'Smoking')}
-            </div>
-          `;
+          const popup = `<div class="venue-popup">
+            <div class="popup-name">${escapeHtml(p.name)}</div>
+            <div class="popup-address">${escapeHtml(p.address || '')}, ${escapeHtml(p.city || '')}, ${escapeHtml(p.state || '')}</div>
+            <div class="popup-metrics"><div><strong>Rating:</strong> ${p.stars ?? '—'} stars</div><div><strong>Reviews:</strong> ${p.review_count || 0}</div></div>
+            <details><summary>Venue amenities</summary>${amenitiesHtml(p, true)}</details>
+          </div>`;
           L.circleMarker([r.lat, r.lon], greyStyle)
             .bindPopup(popup)
             .addTo(map);
@@ -324,37 +387,12 @@
           const info = restaurantLookup[r.restaurant_id];
           if (!info) return;
 
-          const p = info;
-          const stars = p.stars ? '⭐'.repeat(Math.round(p.stars)) + ` ${p.stars}` : '';
-          const price = p.RestaurantsPriceRange2 ? '$'.repeat(parseInt(p.RestaurantsPriceRange2)) : '';
-          const badge = (v, label) => v == null ? '' : `<span style="background:#e8e8f0;color:#333;border-radius:3px;padding:1px 5px;margin:1px;display:inline-block;font-size:0.75em">${v === true ? '✓' : v === false ? '✗' : v} ${label}</span>`;
           const m = L.circleMarker([info.lat, info.lon], highlightStyle)
-            .bindPopup(`
-              <b>#${i+1} ${p.name}</b> ${price}<br>
-              <span style="color:#888">${p.address}, ${p.city}, ${p.state}</span><br>
-              ${stars} &nbsp; ${p.review_count||0} reviews &nbsp; ${p.is_open ? '<span style="color:green">Open</span>' : '<span style="color:red">Closed</span>'}<br>
-              <span style="color:#aaa;font-size:0.8em">${p.label||''}</span><br>
-              <div style="font-size:0.78em;line-height:1.8;margin-top:3px">
-                ${badge(p.RestaurantsTakeOut,'Takeout')}${badge(p.OutdoorSeating,'Outdoor')}${badge(p.GoodForKids,'Kids OK')}${badge(p.HasTV,'TV')}${badge(p.Alcohol,'Alcohol')}${badge(p.WiFi,'WiFi')}${badge(p.NoiseLevel,'Noise')}
-              </div>
-              <hr style="margin:4px 0;border-color:#444">
-              Distance: ${(r.distance_meters/1000).toFixed(2)} km &nbsp;|
-              BM25: ${r.bm25_score.toFixed(3)} &nbsp;|
-              Spatial: ${r.spatial_score.toFixed(3)}<br>
-              <b>Final: ${r.final_score.toFixed(3)}</b>
-            `)
+            .bindPopup(resultPopup(info, r, i + 1))
             .addTo(map);
           resultMarkers.push(m);
 
-          const card = document.createElement('button');
-          card.type = 'button';
-          card.className = 'result-card';
-          card.innerHTML = `
-            <span class="rank">#${i+1}</span>
-            <div class="name">${r.name}</div>
-            <div class="meta">${r.address} · ${(r.distance_meters / 1000).toFixed(2)} km away</div>
-            <div class="scores">BM25: ${r.bm25_score.toFixed(3)} · Spatial: ${r.spatial_score.toFixed(3)} · Final: ${r.final_score.toFixed(3)}</div>
-          `;
+          const card = resultCard(r, info, i + 1);
           card.onclick = () => { map.setView([info.lat, info.lon], 14); m.openPopup(); };
           list.appendChild(card);
         });
@@ -467,18 +505,10 @@
       const info = restaurantLookup[r.restaurant_id];
       if (!info) return;
       const m = L.circleMarker([info.lat, info.lon], highlightStyle)
-        .bindPopup(`<b>#${i+1} ${r.name}</b><br>${r.address}<br>Distance: ${(r.distance_meters/1000).toFixed(2)} km<br>BM25: ${r.bm25_score.toFixed(3)} | Spatial: ${r.spatial_score.toFixed(3)}<br><b>Final: ${r.final_score.toFixed(3)}</b>`)
+        .bindPopup(resultPopup(info, r, i + 1))
         .addTo(map);
       resultMarkers.push(m);
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'result-card';
-      card.innerHTML = `
-        <span class="rank">#${i+1}</span>
-        <div class="name">${r.name}</div>
-        <div class="meta">${r.address} · ${(r.distance_meters/1000).toFixed(2)} km away</div>
-        <div class="scores">BM25: ${r.bm25_score.toFixed(3)} · Spatial: ${r.spatial_score.toFixed(3)} · Final: ${r.final_score.toFixed(3)}</div>
-      `;
+      const card = resultCard(r, info, i + 1);
       card.onclick = () => { map.setView([info.lat, info.lon], 14); m.openPopup(); };
       list.appendChild(card);
     });

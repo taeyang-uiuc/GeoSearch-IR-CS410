@@ -1,5 +1,9 @@
 # GeoSearch-IR
 
+![GeoSearch-IR pizza search showing a restaurant map, ranked results, and venue amenities](docs/images/pizza-search.png)
+
+_Example: a pizza search near Las Vegas shows ranked restaurants, distance, and venue details such as kid friendliness and outdoor seating._
+
 **A Hybrid Spatio-Textual Search Engine for Point-of-Interest Retrieval**  
 CS 410 Term Project · Fall 2026
 
