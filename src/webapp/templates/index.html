@@ -69,6 +69,7 @@
 
     #saved-panel { border-top: 1px solid #313244; margin-top: 10px; padding-top: 10px; }
     #saved-panel h2 { color: #cba6f7; margin-bottom: 8px; font-size: 0.9rem; }
+    #state-name { width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #45475a; border-radius: 4px; }
     .saved-entry { background: #1e1e2e; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
     .saved-entry .saved-label { flex: 1; color: #cdd6f4; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .saved-entry .saved-label:hover { color: #cba6f7; }
@@ -81,10 +82,10 @@
 <div id="controls">
   <h1>🍽 GeoSearch-IR</h1>
   <input type="text" id="query" placeholder="e.g. quiet pizza with outdoor seating" />
-  <input type="number" id="lat" placeholder="Latitude" step="any" style="width:110px" />
-  <input type="number" id="lon" placeholder="Longitude" step="any" style="width:120px" />
-  <input type="number" id="radius" placeholder="Radius (mi)" value="25" step="1" style="width:110px" />
-  <input type="number" id="topk" placeholder="Top K" value="10" step="1" style="width:70px" />
+  <input type="number" id="lat" placeholder="Latitude" min="-90" max="90" step="any" style="width:110px" />
+  <input type="number" id="lon" placeholder="Longitude" min="-180" max="180" step="any" style="width:120px" />
+  <input type="number" id="radius" placeholder="Radius (mi)" value="25" min="0.01" step="any" style="width:110px" />
+  <input type="number" id="topk" placeholder="Top K" value="10" min="1" max="50" step="1" style="width:70px" />
   <button onclick="runSearch()">Search</button>
   <button onclick="useMyLocation()">📍 My Location</button>
   <button onclick="saveState()" style="background:#a6e3a1">💾 Save State</button>
@@ -98,6 +99,7 @@
     <div id="results-list"><p style="color:#a6adc8">Run a search to see results here.</p></div>
     <div id="saved-panel">
       <h2>💾 Saved States</h2>
+      <input type="text" id="state-name" aria-label="Saved search name" placeholder="Saved search name (optional)" />
       <div id="saved-list"><p style="color:#a6adc8;font-size:0.78rem">No saved states yet.</p></div>
     </div>
   </div>
@@ -129,14 +131,19 @@
   let restaurantLookup = {};   // business_id → {lat, lon, name, address, city, state}
   let resultMarkers = [];
   let userMarker = null;
+  let searchVersion = 0;
+  let lastSearchState = null;
 
   // Load all restaurants once
-  fetch('/api/restaurants')
-    .then(r => r.json())
+  const restaurantsReady = fetch('/api/restaurants')
+    .then(r => {
+      if (!r.ok) throw new Error(`Restaurant data request failed (${r.status})`);
+      return r.json();
+    })
     .then(data => {
       data.forEach(r => {
         restaurantLookup[r.business_id] = r;
-        if (r.lat && r.lon) {
+        if (Number.isFinite(r.lat) && Number.isFinite(r.lon)) {
           const p = r;
           const stars = p.stars ? '⭐'.repeat(Math.round(p.stars)) + ` ${p.stars}` : '';
           const price = p.RestaurantsPriceRange2 ? '$'.repeat(parseInt(p.RestaurantsPriceRange2)) : '';
@@ -157,29 +164,37 @@
         }
       });
       document.getElementById('status').textContent = `${data.length} restaurants loaded`;
+      return true;
     })
     .catch(err => {
       document.getElementById('status').textContent = 'Failed to load restaurants: ' + err.message;
+      return false;
     });
 
   function useMyLocation() {
-    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    if (!navigator.geolocation) { document.getElementById('status').textContent = 'Geolocation not supported'; return; }
     navigator.geolocation.getCurrentPosition(pos => {
       document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
       document.getElementById('lon').value = pos.coords.longitude.toFixed(6);
       map.setView([pos.coords.latitude, pos.coords.longitude], 13);
-    }, () => alert('Could not get location'));
+    }, () => { document.getElementById('status').textContent = 'Could not get location. Click the map or enter coordinates.'; });
   }
 
-  function runSearch() {
+  async function runSearch() {
+    const version = ++searchVersion;
+    lastSearchState = null;
+    if (!await restaurantsReady || version !== searchVersion) return;
     const query = document.getElementById('query').value.trim();
     const lat   = parseFloat(document.getElementById('lat').value);
     const lon   = parseFloat(document.getElementById('lon').value);
-    const radius = document.getElementById('radius').value || 25;
-    const topk   = document.getElementById('topk').value || 10;
+    const radius = Number(document.getElementById('radius').value || 25);
+    const topk   = Number(document.getElementById('topk').value || 10);
 
-    if (!query || isNaN(lat) || isNaN(lon)) {
-      alert('Please enter a query, latitude, and longitude.');
+    if (!query || !Number.isFinite(lat) || lat < -90 || lat > 90 ||
+        !Number.isFinite(lon) || lon < -180 || lon > 180 ||
+        !Number.isFinite(radius) || radius <= 0 ||
+        !Number.isInteger(topk) || topk < 1 || topk > 50) {
+      document.getElementById('status').textContent = 'Enter a query, valid coordinates, a positive radius, and Top K between 1 and 50.';
       return;
     }
 
@@ -196,14 +211,19 @@
 
     const url = `/api/search?query=${encodeURIComponent(query)}&lat=${lat}&lon=${lon}&radius_miles=${radius}&top_k=${topk}`;
     fetch(url)
-      .then(r => r.json())
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `Search failed (${response.status})`);
+        return data;
+      })
       .then(results => {
+        if (version !== searchVersion) return;
         if (results.error) {
           document.getElementById('status').textContent = 'Error: ' + results.error;
           return;
         }
         document.getElementById('status').textContent = `${results.length} result(s) found`;
-        _lastResults = results;
+        lastSearchState = { query, lat, lon, radius, topk, results };
 
         const list = document.getElementById('results-list');
         list.innerHTML = '';
@@ -254,6 +274,7 @@
         map.setView([lat, lon], 12);
       })
       .catch(err => {
+        if (version !== searchVersion) return;
         document.getElementById('status').textContent = 'Error: ' + err.message;
       });
   }
@@ -268,10 +289,12 @@
   });
 
   const STORAGE_KEY = 'geosearch_saved_states';
-  let _lastResults = [];
 
   function getSaved() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    }
     catch { return []; }
   }
 
@@ -286,31 +309,40 @@
     saved.forEach((s, i) => {
       const entry = document.createElement('div');
       entry.className = 'saved-entry';
-      entry.innerHTML = `
-        <span class="saved-label" title="${s.label}" onclick="loadState(${i})">${s.label}</span>
-        <button onclick="deleteState(${i})">✕</button>
-      `;
+      const label = document.createElement('span');
+      label.className = 'saved-label';
+      label.textContent = s.label;
+      label.title = s.label;
+      label.onclick = () => loadState(i);
+      const remove = document.createElement('button');
+      remove.textContent = '✕';
+      remove.onclick = () => deleteState(i);
+      entry.append(label, remove);
       el.appendChild(entry);
     });
   }
 
   function saveState() {
-    const query  = document.getElementById('query').value.trim();
-    const lat    = document.getElementById('lat').value;
-    const lon    = document.getElementById('lon').value;
-    const radius = document.getElementById('radius').value || '25';
-    const topk   = document.getElementById('topk').value || '10';
-    if (!query || !lat || !lon) { alert('Run a search first before saving.'); return; }
-    const label = prompt('Name this saved state:', `${query} @ (${parseFloat(lat).toFixed(3)}, ${parseFloat(lon).toFixed(3)})`);
-    if (!label) return;
-    const state = { label, query, lat, lon, radius, topk, results: _lastResults };
+    if (!lastSearchState) { document.getElementById('status').textContent = 'Complete a search before saving.'; return; }
+    const { query, lat, lon } = lastSearchState;
+    const label = document.getElementById('state-name').value.trim() ||
+      `${query} @ (${parseFloat(lat).toFixed(3)}, ${parseFloat(lon).toFixed(3)})`;
+    const state = { ...lastSearchState, label };
     const saved = getSaved();
     saved.unshift(state);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    } catch {
+      document.getElementById('status').textContent = 'Could not save this search. Check browser storage availability.';
+      return;
+    }
     renderSaved();
+    document.getElementById('status').textContent = `Saved: ${label}`;
   }
 
-  function loadState(i) {
+  async function loadState(i) {
+    const version = ++searchVersion;
+    if (!await restaurantsReady || version !== searchVersion) return;
     const s = getSaved()[i];
     if (!s) return;
     document.getElementById('query').value  = s.query;
@@ -318,7 +350,12 @@
     document.getElementById('lon').value    = s.lon;
     document.getElementById('radius').value = s.radius;
     document.getElementById('topk').value   = s.topk;
-    if (s.results && s.results.length) restoreResults(s);
+    if (Array.isArray(s.results)) {
+      lastSearchState = s;
+      restoreResults(s);
+    } else {
+      runSearch();
+    }
   }
 
   function deleteState(i) {

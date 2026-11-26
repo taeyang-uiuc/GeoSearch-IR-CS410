@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
+from functools import lru_cache
+from math import isfinite
 from pathlib import Path
+from threading import Lock
 
 from flask import Flask, jsonify, render_template, request
 
@@ -14,6 +18,7 @@ JSONL_PATH = BASE_DIR / "data/restaurants.jsonl"
 INDEX_PATH = BASE_DIR / "geosearch_work/index"
 
 app = Flask(__name__)
+_search_lock = Lock()
 
 with GEOJSON_PATH.open(encoding="utf-8") as f:
     _geojson = json.load(f)
@@ -42,43 +47,65 @@ def search():
         lon = float(request.args.get("lon"))
         radius_miles = float(request.args.get("radius_miles", 25))
         top_k = int(request.args.get("top_k", 10))
-    except (TypeError, ValueError) as e:
-        return jsonify({"error": str(e)}), 400
+    except (TypeError, ValueError):
+        return jsonify({"error": "lat, lon, and radius must be numbers; top_k must be an integer"}), 400
 
     if not query:
         return jsonify({"error": "query is required"}), 400
+    if not isfinite(lat) or not -90 <= lat <= 90:
+        return jsonify({"error": "latitude must be between -90 and 90"}), 400
+    if not isfinite(lon) or not -180 <= lon <= 180:
+        return jsonify({"error": "longitude must be between -180 and 180"}), 400
+    if not isfinite(radius_miles) or radius_miles <= 0:
+        return jsonify({"error": "radius must be a positive finite number"}), 400
+    if not 1 <= top_k <= 50:
+        return jsonify({"error": "top_k must be between 1 and 50"}), 400
+    if not (INDEX_PATH / "segments.gen").exists() and not any(INDEX_PATH.glob("segments_*")):
+        return jsonify({"error": "Lucene index is missing. Run python -m src.text.bm25_search --build-only, then restart the server."}), 503
+
+    from src.search.adapters import pyserini_filtered_bm25_search
+    from src.search.hybrid_search import exponential_distance_decay, search_restaurants
+    from src.text.bm25_search import open_searcher
+
+    try:
+        # R-tree access is serialized because libspatialindex is not thread-safe.
+        with _search_lock:
+            spatial_candidates = _spatial_candidates()
+            lucene_searcher = open_searcher(INDEX_PATH)
+            try:
+                results = search_restaurants(
+                    query=query,
+                    user_latitude=lat,
+                    user_longitude=lon,
+                    radius_meters=radius_miles * 1609.344,
+                    spatial_candidates=spatial_candidates,
+                    bm25_search=pyserini_filtered_bm25_search(lucene_searcher),
+                    distance_decay=exponential_distance_decay(5 * 1609.344),
+                    candidate_limit=50,
+                    top_k=top_k,
+                )
+            finally:
+                lucene_searcher.close()
+    except Exception:
+        app.logger.exception("Hybrid search failed")
+        return jsonify({"error": "Search failed. Check the server log and the Python/Java environment, then verify the Lucene index."}), 500
+
+    return jsonify([asdict(result) for result in results])
+
+
+@lru_cache(maxsize=1)
+def _spatial_candidates():
+    """Build immutable spatial inputs once per server process."""
 
     from src.geo.create_geo_index import build_rtree
     from src.search.adapters import (
         load_jsonl_metadata,
-        pyserini_filtered_bm25_search,
         rtree_candidate_provider,
     )
-    from src.search.hybrid_search import exponential_distance_decay, search_restaurants
-    from src.text.bm25_search import open_searcher
 
     spatial_index, spatial_rows = build_rtree(str(CSV_PATH))
     metadata = load_jsonl_metadata(JSONL_PATH)
-    spatial_candidates = rtree_candidate_provider(spatial_index, spatial_rows, metadata_by_id=metadata)
-    lucene_searcher = open_searcher(INDEX_PATH)
-
-    try:
-        results = search_restaurants(
-            query=query,
-            user_latitude=lat,
-            user_longitude=lon,
-            radius_meters=radius_miles * 1609.344,
-            spatial_candidates=spatial_candidates,
-            bm25_search=pyserini_filtered_bm25_search(lucene_searcher),
-            distance_decay=exponential_distance_decay(5 * 1609.344),
-            candidate_limit=50,
-            top_k=top_k,
-        )
-    finally:
-        lucene_searcher.close()
-
-    from dataclasses import asdict
-    return jsonify([asdict(r) for r in results])
+    return rtree_candidate_provider(spatial_index, spatial_rows, metadata_by_id=metadata)
 
 
 if __name__ == "__main__":

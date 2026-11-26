@@ -51,7 +51,7 @@ Taeyang's integration module is implemented in [`src/search/hybrid_search.py`](s
 From the repository root, use Python 3.12 and Java 21. Set `JAVA_HOME` for your JDK if your environment does not already expose it. [Pyserini installation guide](https://github.com/castorini/pyserini#-installation)
 
 ```bash
-python -m pip install 'pyserini==1.2.0' pandas rtree geopy
+python -m pip install 'pyserini==1.2.0' pandas rtree geopy flask
 python -m src.text.bm25_search --build-only
 python -m src.scripts.run_hybrid_query \
   --query 'pizza' --latitude 36.12 --longitude -115.17
@@ -190,6 +190,10 @@ python -m src.webapp.app
 
 Then open `http://localhost:5000` in your browser.
 
+Use the same Python 3.12 / Java 21 environment as the hybrid CLI. The first search initializes Pyserini and loads the spatial data. Later searches reuse the R-tree and restaurant metadata. Restart the server after regenerating data or rebuilding the index.
+
+An invalid query parameter returns a JSON error with HTTP 400. Top K supports 1 through 50 results. If the Lucene index is missing, the app returns HTTP 503 with the build command. Other search failures return a JSON error while the server log records the underlying exception. If port 5000 is occupied, run `python -m flask --app src.webapp.app run --port 5001` and open `http://localhost:5001`.
+
 **Features**
 
 - All restaurants appear as grey dots on load (canvas-rendered for performance)
@@ -199,7 +203,9 @@ Then open `http://localhost:5000` in your browser.
 - Results appear as red highlighted markers; a ranked sidebar shows name, distance, BM25/spatial/final scores
 - Clicking a sidebar card zooms the map to that restaurant and opens its popup
 - Popups show full restaurant details: stars, review count, cuisine label, price range, and attribute badges (takeout, outdoor seating, WiFi, alcohol, noise level, etc.)
-- **💾 Save State** captures the current query, coordinates, parameters, and results to `localStorage` for later reload
+- **💾 Save State** captures the last completed query, coordinates, parameters, and results to `localStorage` for later reload
+- Saved states capture the last completed search. Searches and saved-state loading wait for restaurant markers to load, and older search responses are ignored after a newer search starts.
+- Enter an optional saved-search name in the sidebar, then click Save State. Saving uses the page controls and works in browsers that disable JavaScript prompt dialogs.
 
 ---
 
