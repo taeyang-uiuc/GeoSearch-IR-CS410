@@ -165,6 +165,44 @@ Output: `src/resources/restaurant_reviews.kml`
 
 ---
 
+## Web app
+
+The validation webapp plots all 13,144 restaurants on an interactive Leaflet map and lets you run hybrid searches visually.
+
+**1. Install Flask**
+
+```bash
+python -m pip install flask
+```
+
+**2. Build the BM25 index** (skip if `geosearch_work/index` already exists)
+
+```bash
+python -m src.text.bm25_search --build-only
+```
+
+**3. Start the server**
+
+```bash
+conda activate pyserini
+python -m src.webapp.app
+```
+
+Then open `http://localhost:5000` in your browser.
+
+**Features**
+
+- All restaurants appear as grey dots on load (canvas-rendered for performance)
+- Click anywhere on the map to set that position as your query location
+- Use **📍 My Location** to fill lat/lon from the browser's geolocation API
+- Search form accepts: query text, latitude, longitude, radius (miles), top-k
+- Results appear as red highlighted markers; a ranked sidebar shows name, distance, BM25/spatial/final scores
+- Clicking a sidebar card zooms the map to that restaurant and opens its popup
+- Popups show full restaurant details: stars, review count, cuisine label, price range, and attribute badges (takeout, outdoor seating, WiFi, alcohol, noise level, etc.)
+- **💾 Save State** captures the current query, coordinates, parameters, and results to `localStorage` for later reload
+
+---
+
 ## Course submissions
 
 - **Progress report** — [PDF](output/pdf/GeoSearch-IR_Progress_Report.pdf)

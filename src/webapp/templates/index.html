@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>GeoSearch-IR Validator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+
+    #controls {
+      padding: 10px 16px;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    #controls h1 { font-size: 1rem; color: #cba6f7; white-space: nowrap; }
+    #controls input {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #45475a;
+      background: #313244;
+      color: #cdd6f4;
+      font-size: 0.85rem;
+    }
+    #controls input[type="text"] { flex: 1; min-width: 180px; }
+    #controls button {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: none;
+      background: #cba6f7;
+      color: #1e1e2e;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    #controls button:hover { background: #b4befe; }
+    #status { font-size: 0.8rem; color: #a6e3a1; white-space: nowrap; }
+
+    #main { display: flex; flex: 1; overflow: hidden; }
+    #map { flex: 1; }
+
+    #sidebar {
+      width: 300px;
+      background: #181825;
+      color: #cdd6f4;
+      overflow-y: auto;
+      padding: 10px;
+      font-size: 0.82rem;
+    }
+    #sidebar h2 { color: #cba6f7; margin-bottom: 8px; font-size: 0.9rem; }
+    .result-card {
+      background: #313244;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      border-left: 3px solid #f38ba8;
+    }
+    .result-card:hover { background: #45475a; }
+    .result-card .rank { font-weight: bold; color: #f38ba8; }
+    .result-card .name { font-weight: bold; color: #cdd6f4; }
+    .result-card .meta { color: #a6adc8; font-size: 0.78rem; margin-top: 2px; }
+    .result-card .scores { color: #94e2d5; font-size: 0.75rem; margin-top: 4px; }
+
+    #saved-panel { border-top: 1px solid #313244; margin-top: 10px; padding-top: 10px; }
+    #saved-panel h2 { color: #cba6f7; margin-bottom: 8px; font-size: 0.9rem; }
+    .saved-entry { background: #1e1e2e; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
+    .saved-entry .saved-label { flex: 1; color: #cdd6f4; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .saved-entry .saved-label:hover { color: #cba6f7; }
+    .saved-entry button { padding: 2px 7px; border-radius: 4px; border: none; background: #45475a; color: #f38ba8; cursor: pointer; font-size: 0.75rem; }
+    .saved-entry button:hover { background: #585b70; }
+  </style>
+</head>
+<body>
+
+<div id="controls">
+  <h1>🍽 GeoSearch-IR</h1>
+  <input type="text" id="query" placeholder="e.g. quiet pizza with outdoor seating" />
+  <input type="number" id="lat" placeholder="Latitude" step="any" style="width:110px" />
+  <input type="number" id="lon" placeholder="Longitude" step="any" style="width:120px" />
+  <input type="number" id="radius" placeholder="Radius (mi)" value="25" step="1" style="width:110px" />
+  <input type="number" id="topk" placeholder="Top K" value="10" step="1" style="width:70px" />
+  <button onclick="runSearch()">Search</button>
+  <button onclick="useMyLocation()">📍 My Location</button>
+  <button onclick="saveState()" style="background:#a6e3a1">💾 Save State</button>
+  <span id="status">Loading restaurants…</span>
+</div>
+
+<div id="main">
+  <div id="map"></div>
+  <div id="sidebar">
+    <h2>Search Results</h2>
+    <div id="results-list"><p style="color:#a6adc8">Run a search to see results here.</p></div>
+    <div id="saved-panel">
+      <h2>💾 Saved States</h2>
+      <div id="saved-list"><p style="color:#a6adc8;font-size:0.78rem">No saved states yet.</p></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // Use canvas renderer so 13k dots don't freeze the browser
+  const renderer = L.canvas({ padding: 0.5 });
+
+  const map = L.map('map').setView([39.5, -98.35], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  const greyStyle    = { renderer, radius: 3, fillColor: '#6c7086', color: '#6c7086', weight: 0, fillOpacity: 0.55 };
+  const highlightStyle = { radius: 9, fillColor: '#f38ba8', color: '#1e1e2e', weight: 2, fillOpacity: 0.95 };
+  const pinIcon = L.divIcon({
+    className: '',
+    html: '<div style="position:relative;width:20px;height:34px">'
+        + '<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;background:#a6e3a1;border:3px solid #1e1e2e;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>'
+        + '<div style="position:absolute;top:5px;left:5px;width:6px;height:6px;border-radius:50%;background:#1e1e2e"></div>'
+        + '</div>',
+    iconSize: [20, 34],
+    iconAnchor: [10, 34],
+    popupAnchor: [0, -36],
+  });
+
+  let restaurantLookup = {};   // business_id → {lat, lon, name, address, city, state}
+  let resultMarkers = [];
+  let userMarker = null;
+
+  // Load all restaurants once
+  fetch('/api/restaurants')
+    .then(r => r.json())
+    .then(data => {
+      data.forEach(r => {
+        restaurantLookup[r.business_id] = r;
+        if (r.lat && r.lon) {
+          const p = r;
+          const stars = p.stars ? '⭐'.repeat(Math.round(p.stars)) + ` ${p.stars}` : '';
+          const price = p.RestaurantsPriceRange2 ? '$'.repeat(parseInt(p.RestaurantsPriceRange2)) : '';
+          const badge = (v, label) => v == null ? '' : `<span style="background:#e8e8f0;color:#333;border-radius:3px;padding:1px 5px;margin:1px;display:inline-block;font-size:0.75em">${v === true ? '✓' : v === false ? '✗' : v} ${label}</span>`;
+          const popup = `
+            <b>${p.name}</b> ${price}<br>
+            <span style="color:#888">${p.address}, ${p.city}, ${p.state} ${p.postal_code||''}</span><br>
+            ${stars} &nbsp; <span style="color:#888">${p.review_count||0} reviews</span> &nbsp; ${p.is_open ? '<span style="color:green">Open</span>' : '<span style="color:red">Closed</span>'}<br>
+            <span style="color:#aaa;font-size:0.8em">${p.label||''}</span><br>
+            <div style="margin-top:4px;font-size:0.78em;line-height:1.8">
+              ${badge(p.RestaurantsTakeOut,'Takeout')}${badge(p.RestaurantsDelivery,'Delivery')}${badge(p.OutdoorSeating,'Outdoor')}${badge(p.RestaurantsReservations,'Reservations')}${badge(p.GoodForKids,'Kids OK')}${badge(p.RestaurantsGoodForGroups,'Groups')}${badge(p.HasTV,'TV')}${badge(p.HappyHour,'Happy Hour')}${badge(p.Caters,'Catering')}${badge(p.BikeParking,'Bike Parking')}${badge(p.WheelchairAccessible,'Accessible')}${badge(p.DogsAllowed,'Dogs OK')}
+              ${p.Alcohol && p.Alcohol!=='none' ? badge(p.Alcohol,'Alcohol') : ''}${badge(p.WiFi,'WiFi')}${badge(p.NoiseLevel,'Noise')}${badge(p.RestaurantsAttire,'Attire')}${badge(p.Smoking,'Smoking')}
+            </div>
+          `;
+          L.circleMarker([r.lat, r.lon], greyStyle)
+            .bindPopup(popup)
+            .addTo(map);
+        }
+      });
+      document.getElementById('status').textContent = `${data.length} restaurants loaded`;
+    })
+    .catch(err => {
+      document.getElementById('status').textContent = 'Failed to load restaurants: ' + err.message;
+    });
+
+  function useMyLocation() {
+    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    navigator.geolocation.getCurrentPosition(pos => {
+      document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
+      document.getElementById('lon').value = pos.coords.longitude.toFixed(6);
+      map.setView([pos.coords.latitude, pos.coords.longitude], 13);
+    }, () => alert('Could not get location'));
+  }
+
+  function runSearch() {
+    const query = document.getElementById('query').value.trim();
+    const lat   = parseFloat(document.getElementById('lat').value);
+    const lon   = parseFloat(document.getElementById('lon').value);
+    const radius = document.getElementById('radius').value || 25;
+    const topk   = document.getElementById('topk').value || 10;
+
+    if (!query || isNaN(lat) || isNaN(lon)) {
+      alert('Please enter a query, latitude, and longitude.');
+      return;
+    }
+
+    document.getElementById('status').textContent = 'Searching…';
+    document.getElementById('results-list').innerHTML = '';
+
+    resultMarkers.forEach(m => map.removeLayer(m));
+    resultMarkers = [];
+    if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+
+    userMarker = L.marker([lat, lon], { icon: pinIcon })
+      .bindPopup('<b>Your location</b>')
+      .addTo(map);
+
+    const url = `/api/search?query=${encodeURIComponent(query)}&lat=${lat}&lon=${lon}&radius_miles=${radius}&top_k=${topk}`;
+    fetch(url)
+      .then(r => r.json())
+      .then(results => {
+        if (results.error) {
+          document.getElementById('status').textContent = 'Error: ' + results.error;
+          return;
+        }
+        document.getElementById('status').textContent = `${results.length} result(s) found`;
+        _lastResults = results;
+
+        const list = document.getElementById('results-list');
+        list.innerHTML = '';
+
+        if (!results.length) {
+          list.innerHTML = '<p style="color:#f38ba8">No results found for this query and location.</p>';
+          return;
+        }
+
+        results.forEach((r, i) => {
+          const info = restaurantLookup[r.restaurant_id];
+          if (!info) return;
+
+          const p = info;
+          const stars = p.stars ? '⭐'.repeat(Math.round(p.stars)) + ` ${p.stars}` : '';
+          const price = p.RestaurantsPriceRange2 ? '$'.repeat(parseInt(p.RestaurantsPriceRange2)) : '';
+          const badge = (v, label) => v == null ? '' : `<span style="background:#e8e8f0;color:#333;border-radius:3px;padding:1px 5px;margin:1px;display:inline-block;font-size:0.75em">${v === true ? '✓' : v === false ? '✗' : v} ${label}</span>`;
+          const m = L.circleMarker([info.lat, info.lon], highlightStyle)
+            .bindPopup(`
+              <b>#${i+1} ${p.name}</b> ${price}<br>
+              <span style="color:#888">${p.address}, ${p.city}, ${p.state}</span><br>
+              ${stars} &nbsp; ${p.review_count||0} reviews &nbsp; ${p.is_open ? '<span style="color:green">Open</span>' : '<span style="color:red">Closed</span>'}<br>
+              <span style="color:#aaa;font-size:0.8em">${p.label||''}</span><br>
+              <div style="font-size:0.78em;line-height:1.8;margin-top:3px">
+                ${badge(p.RestaurantsTakeOut,'Takeout')}${badge(p.OutdoorSeating,'Outdoor')}${badge(p.GoodForKids,'Kids OK')}${badge(p.HasTV,'TV')}${badge(p.Alcohol,'Alcohol')}${badge(p.WiFi,'WiFi')}${badge(p.NoiseLevel,'Noise')}
+              </div>
+              <hr style="margin:4px 0;border-color:#444">
+              Distance: ${(r.distance_meters/1000).toFixed(2)} km &nbsp;|
+              BM25: ${r.bm25_score.toFixed(3)} &nbsp;|
+              Spatial: ${r.spatial_score.toFixed(3)}<br>
+              <b>Final: ${r.final_score.toFixed(3)}</b>
+            `)
+            .addTo(map);
+          resultMarkers.push(m);
+
+          const card = document.createElement('div');
+          card.className = 'result-card';
+          card.innerHTML = `
+            <span class="rank">#${i+1}</span>
+            <div class="name">${r.name}</div>
+            <div class="meta">${r.address} · ${(r.distance_meters / 1000).toFixed(2)} km away</div>
+            <div class="scores">BM25: ${r.bm25_score.toFixed(3)} · Spatial: ${r.spatial_score.toFixed(3)} · Final: ${r.final_score.toFixed(3)}</div>
+          `;
+          card.onclick = () => { map.setView([info.lat, info.lon], 14); m.openPopup(); };
+          list.appendChild(card);
+        });
+
+        map.setView([lat, lon], 12);
+      })
+      .catch(err => {
+        document.getElementById('status').textContent = 'Error: ' + err.message;
+      });
+  }
+
+  document.getElementById('query').addEventListener('keydown', e => {
+    if (e.key === 'Enter') runSearch();
+  });
+
+  map.on('click', e => {
+    document.getElementById('lat').value = e.latlng.lat.toFixed(6);
+    document.getElementById('lon').value = e.latlng.lng.toFixed(6);
+  });
+
+  const STORAGE_KEY = 'geosearch_saved_states';
+  let _lastResults = [];
+
+  function getSaved() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  function renderSaved() {
+    const saved = getSaved();
+    const el = document.getElementById('saved-list');
+    if (!saved.length) {
+      el.innerHTML = '<p style="color:#a6adc8;font-size:0.78rem">No saved states yet.</p>';
+      return;
+    }
+    el.innerHTML = '';
+    saved.forEach((s, i) => {
+      const entry = document.createElement('div');
+      entry.className = 'saved-entry';
+      entry.innerHTML = `
+        <span class="saved-label" title="${s.label}" onclick="loadState(${i})">${s.label}</span>
+        <button onclick="deleteState(${i})">✕</button>
+      `;
+      el.appendChild(entry);
+    });
+  }
+
+  function saveState() {
+    const query  = document.getElementById('query').value.trim();
+    const lat    = document.getElementById('lat').value;
+    const lon    = document.getElementById('lon').value;
+    const radius = document.getElementById('radius').value || '25';
+    const topk   = document.getElementById('topk').value || '10';
+    if (!query || !lat || !lon) { alert('Run a search first before saving.'); return; }
+    const label = prompt('Name this saved state:', `${query} @ (${parseFloat(lat).toFixed(3)}, ${parseFloat(lon).toFixed(3)})`);
+    if (!label) return;
+    const state = { label, query, lat, lon, radius, topk, results: _lastResults };
+    const saved = getSaved();
+    saved.unshift(state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    renderSaved();
+  }
+
+  function loadState(i) {
+    const s = getSaved()[i];
+    if (!s) return;
+    document.getElementById('query').value  = s.query;
+    document.getElementById('lat').value    = s.lat;
+    document.getElementById('lon').value    = s.lon;
+    document.getElementById('radius').value = s.radius;
+    document.getElementById('topk').value   = s.topk;
+    if (s.results && s.results.length) restoreResults(s);
+  }
+
+  function deleteState(i) {
+    const saved = getSaved();
+    saved.splice(i, 1);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+    renderSaved();
+  }
+
+  function restoreResults(s) {
+    const lat = parseFloat(s.lat), lon = parseFloat(s.lon);
+    resultMarkers.forEach(m => map.removeLayer(m));
+    resultMarkers = [];
+    if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+    userMarker = L.marker([lat, lon], { icon: pinIcon }).bindPopup('<b>Your location</b>').addTo(map);
+    const list = document.getElementById('results-list');
+    list.innerHTML = '';
+    s.results.forEach((r, i) => {
+      const info = restaurantLookup[r.restaurant_id];
+      if (!info) return;
+      const m = L.circleMarker([info.lat, info.lon], highlightStyle)
+        .bindPopup(`<b>#${i+1} ${r.name}</b><br>${r.address}<br>Distance: ${(r.distance_meters/1000).toFixed(2)} km<br>BM25: ${r.bm25_score.toFixed(3)} | Spatial: ${r.spatial_score.toFixed(3)}<br><b>Final: ${r.final_score.toFixed(3)}</b>`)
+        .addTo(map);
+      resultMarkers.push(m);
+      const card = document.createElement('div');
+      card.className = 'result-card';
+      card.innerHTML = `
+        <span class="rank">#${i+1}</span>
+        <div class="name">${r.name}</div>
+        <div class="meta">${r.address} · ${(r.distance_meters/1000).toFixed(2)} km away</div>
+        <div class="scores">BM25: ${r.bm25_score.toFixed(3)} · Spatial: ${r.spatial_score.toFixed(3)} · Final: ${r.final_score.toFixed(3)}</div>
+      `;
+      card.onclick = () => { map.setView([info.lat, info.lon], 14); m.openPopup(); };
+      list.appendChild(card);
+    });
+    map.setView([lat, lon], 12);
+    document.getElementById('status').textContent = `Loaded: ${s.results.length} result(s)`;
+  }
+
+  renderSaved();
+</script>
+
+</body>
+</html>
