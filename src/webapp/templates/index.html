@@ -5,105 +5,192 @@
   <title>GeoSearch-IR Validator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+    :root {
+      color-scheme: light;
+      font: 15px/1.5 "DM Sans", system-ui, sans-serif;
+      color: #192c29;
+      background: #f2f5f2;
+      --muted: #526761;
+      --border: #dbe5de;
+      --accent: #17634f;
+      --surface: #fff;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    h1, h2, p { margin: 0; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 3px solid #33846c; outline-offset: 3px; }
+
+    .masthead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px 24px;
+      padding: 14px clamp(16px, 3vw, 40px);
+      background: #143d34;
+      color: #fff;
+    }
+
+    .masthead h1 { font-size: 1.4rem; letter-spacing: -.035em; }
+    #status { font-size: .875rem; color: #d9eee5; overflow-wrap: anywhere; }
+
+    .workspace {
+      width: min(100%, 1680px);
+      margin-inline: auto;
+      padding: clamp(12px, 2vw, 28px);
+      display: grid;
+      gap: 16px;
+    }
+
+    #controls, #sidebar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: clamp(12px, 2vw, 20px);
+    }
 
     #controls {
-      padding: 10px 16px;
-      background: #1e1e2e;
-      color: #cdd6f4;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: minmax(200px, 2.4fr) repeat(4, minmax(90px, 1fr)) auto;
+      align-items: end;
+      gap: 12px;
     }
-    #controls h1 { font-size: 1rem; color: #cba6f7; white-space: nowrap; }
-    #controls input {
-      padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid #45475a;
-      background: #313244;
-      color: #cdd6f4;
-      font-size: 0.85rem;
-    }
-    #controls input[type="text"] { flex: 1; min-width: 180px; }
-    #controls button {
-      padding: 6px 14px;
-      border-radius: 6px;
-      border: none;
-      background: #cba6f7;
-      color: #1e1e2e;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 0.85rem;
-    }
-    #controls button:hover { background: #b4befe; }
-    #status { font-size: 0.8rem; color: #a6e3a1; white-space: nowrap; }
 
-    #main { display: flex; flex: 1; overflow: hidden; }
-    #map { flex: 1; }
-
-    #sidebar {
-      width: 300px;
-      background: #181825;
-      color: #cdd6f4;
-      overflow-y: auto;
-      padding: 10px;
-      font-size: 0.82rem;
-    }
-    #sidebar h2 { color: #cba6f7; margin-bottom: 8px; font-size: 0.9rem; }
-    .result-card {
-      background: #313244;
-      border-radius: 6px;
+    .field { display: grid; gap: 4px; min-width: 0; font-weight: 700; font-size: .81rem; }
+    input {
+      width: 100%;
+      min-width: 0;
+      min-height: 44px;
       padding: 8px 10px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      border-left: 3px solid #f38ba8;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: inherit;
+      background: #f8fbf9;
+      font-size: 1rem;
     }
-    .result-card:hover { background: #45475a; }
-    .result-card .rank { font-weight: bold; color: #f38ba8; }
-    .result-card .name { font-weight: bold; color: #cdd6f4; }
-    .result-card .meta { color: #a6adc8; font-size: 0.78rem; margin-top: 2px; }
-    .result-card .scores { color: #94e2d5; font-size: 0.75rem; margin-top: 4px; }
 
-    #saved-panel { border-top: 1px solid #313244; margin-top: 10px; padding-top: 10px; }
-    #saved-panel h2 { color: #cba6f7; margin-bottom: 8px; font-size: 0.9rem; }
-    #state-name { width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #45475a; border-radius: 4px; }
-    .saved-entry { background: #1e1e2e; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
-    .saved-entry .saved-label { flex: 1; color: #cdd6f4; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-    .saved-entry .saved-label:hover { color: #cba6f7; }
-    .saved-entry button { padding: 2px 7px; border-radius: 4px; border: none; background: #45475a; color: #f38ba8; cursor: pointer; font-size: 0.75rem; }
-    .saved-entry button:hover { background: #585b70; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .action {
+      min-height: 44px;
+      padding: 8px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #ebf4ef;
+      color: #194e40;
+      font-weight: 700;
+    }
+
+    .action.primary { background: var(--accent); color: #fff; border-color: transparent; }
+    .action:hover { filter: brightness(.94); }
+
+    #main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(275px, 345px);
+      height: max(480px, calc(100dvh - 177px));
+      gap: 16px;
+    }
+
+    #map { min-width: 0; border: 1px solid var(--border); border-radius: 16px; background: #e3ebe5; }
+    #sidebar { min-width: 0; overflow: auto; }
+    #sidebar h2 { font-size: 1.1rem; letter-spacing: -.02em; margin-bottom: 10px; }
+    .empty { color: var(--muted); font-size: .9rem; }
+    .result-card {
+      display: grid;
+      width: 100%;
+      gap: 4px;
+      text-align: left;
+      color: inherit;
+      margin-bottom: 9px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #f8fbf9;
+      overflow-wrap: anywhere;
+    }
+
+    .result-card:hover { background: #eaf5ef; border-color: #99c7b5; }
+    .result-card .rank, .result-card .scores { color: var(--accent); font-size: .79rem; font-weight: 700; }
+    .result-card .name { font-weight: 700; }
+    .result-card .meta { color: var(--muted); font-size: .86rem; }
+
+    #saved-panel { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px; }
+    #saved-panel .actions { margin: 8px 0 12px; }
+    .saved-entry { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .saved-entry button {
+      min-height: 44px;
+      min-width: 44px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #f8fbf9;
+      color: #194e40;
+      padding: 6px 9px;
+    }
+
+    .saved-entry .saved-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+    .saved-entry button:hover { background: #eaf5ef; }
+
+    @media (max-width: 1100px) {
+      #controls { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .query-field, #controls .actions { grid-column: span 2; }
+      #main { height: max(480px, calc(100dvh - 240px)); }
+    }
+
+    @media (max-width: 720px) {
+      #controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #controls .actions > * { flex: 1; }
+      #main { grid-template-columns: minmax(0, 1fr); height: auto; }
+      #map { height: clamp(280px, 48dvh, 450px); }
+    }
   </style>
 </head>
 <body>
+  <header class="masthead">
+    <h1>GeoSearch-IR</h1>
+    <p id="status" role="status">Loading restaurants…</p>
+  </header>
 
-<div id="controls">
-  <h1>🍽 GeoSearch-IR</h1>
-  <input type="text" id="query" placeholder="e.g. quiet pizza with outdoor seating" />
-  <input type="number" id="lat" placeholder="Latitude" min="-90" max="90" step="any" style="width:110px" />
-  <input type="number" id="lon" placeholder="Longitude" min="-180" max="180" step="any" style="width:120px" />
-  <input type="number" id="radius" placeholder="Radius (mi)" value="25" min="0.01" step="any" style="width:110px" />
-  <input type="number" id="topk" placeholder="Top K" value="10" min="1" max="50" step="1" style="width:70px" />
-  <button onclick="runSearch()">Search</button>
-  <button onclick="useMyLocation()">📍 My Location</button>
-  <button onclick="saveState()" style="background:#a6e3a1">💾 Save State</button>
-  <span id="status">Loading restaurants…</span>
-</div>
+  <main class="workspace">
+    <form id="controls" aria-label="Restaurant search">
+      <label class="field query-field">Search restaurants
+        <input type="search" id="query" placeholder="e.g. quiet pizza with outdoor seating" />
+      </label>
+      <label class="field">Latitude
+        <input type="number" id="lat" min="-90" max="90" step="any" />
+      </label>
+      <label class="field">Longitude
+        <input type="number" id="lon" min="-180" max="180" step="any" />
+      </label>
+      <label class="field">Radius (mi)
+        <input type="number" id="radius" value="25" step="any" />
+      </label>
+      <label class="field">Top K
+        <input type="number" id="topk" value="10" min="1" max="50" step="1" />
+      </label>
+      <div class="actions">
+        <button class="action primary" type="submit">Search</button>
+        <button class="action" type="button" onclick="useMyLocation()">My Location</button>
+      </div>
+    </form>
 
-<div id="main">
-  <div id="map"></div>
-  <div id="sidebar">
-    <h2>Search Results</h2>
-    <div id="results-list"><p style="color:#a6adc8">Run a search to see results here.</p></div>
-    <div id="saved-panel">
-      <h2>💾 Saved States</h2>
-      <input type="text" id="state-name" aria-label="Saved search name" placeholder="Saved search name (optional)" />
-      <div id="saved-list"><p style="color:#a6adc8;font-size:0.78rem">No saved states yet.</p></div>
+    <div id="main">
+      <div id="map" aria-label="Restaurant map"></div>
+      <aside id="sidebar" aria-label="Search results and saved searches">
+        <h2>Search Results</h2>
+        <div id="results-list"><p class="empty">Run a search to see results here.</p></div>
+        <section id="saved-panel">
+          <h2>Saved States</h2>
+          <input type="text" id="state-name" aria-label="Saved search name" placeholder="Saved search name (optional)" />
+          <div class="actions"><button class="action" type="button" onclick="saveState()">Save State</button></div>
+          <div id="saved-list"><p class="empty">No saved states yet.</p></div>
+        </section>
+      </aside>
     </div>
-  </div>
-</div>
+  </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -116,12 +203,12 @@
   }).addTo(map);
 
   const greyStyle    = { renderer, radius: 3, fillColor: '#6c7086', color: '#6c7086', weight: 0, fillOpacity: 0.55 };
-  const highlightStyle = { radius: 9, fillColor: '#f38ba8', color: '#1e1e2e', weight: 2, fillOpacity: 0.95 };
+  const highlightStyle = { radius: 9, fillColor: '#d45139', color: '#fff', weight: 2, fillOpacity: 0.95 };
   const pinIcon = L.divIcon({
     className: '',
     html: '<div style="position:relative;width:20px;height:34px">'
-        + '<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;background:#a6e3a1;border:3px solid #1e1e2e;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>'
-        + '<div style="position:absolute;top:5px;left:5px;width:6px;height:6px;border-radius:50%;background:#1e1e2e"></div>'
+        + '<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;background:#47ac89;border:3px solid #143d34;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>'
+        + '<div style="position:absolute;top:5px;left:5px;width:6px;height:6px;border-radius:50%;background:#143d34"></div>'
         + '</div>',
     iconSize: [20, 34],
     iconAnchor: [10, 34],
@@ -229,7 +316,7 @@
         list.innerHTML = '';
 
         if (!results.length) {
-          list.innerHTML = '<p style="color:#f38ba8">No results found for this query and location.</p>';
+          list.innerHTML = '<p class="empty">No results found for this query and location.</p>';
           return;
         }
 
@@ -259,7 +346,8 @@
             .addTo(map);
           resultMarkers.push(m);
 
-          const card = document.createElement('div');
+          const card = document.createElement('button');
+          card.type = 'button';
           card.className = 'result-card';
           card.innerHTML = `
             <span class="rank">#${i+1}</span>
@@ -279,8 +367,9 @@
       });
   }
 
-  document.getElementById('query').addEventListener('keydown', e => {
-    if (e.key === 'Enter') runSearch();
+  document.getElementById('controls').addEventListener('submit', event => {
+    event.preventDefault();
+    runSearch();
   });
 
   map.on('click', e => {
@@ -302,20 +391,21 @@
     const saved = getSaved();
     const el = document.getElementById('saved-list');
     if (!saved.length) {
-      el.innerHTML = '<p style="color:#a6adc8;font-size:0.78rem">No saved states yet.</p>';
+      el.innerHTML = '<p class="empty">No saved states yet.</p>';
       return;
     }
     el.innerHTML = '';
     saved.forEach((s, i) => {
       const entry = document.createElement('div');
       entry.className = 'saved-entry';
-      const label = document.createElement('span');
+      const label = document.createElement('button');
       label.className = 'saved-label';
       label.textContent = s.label;
       label.title = s.label;
       label.onclick = () => loadState(i);
       const remove = document.createElement('button');
       remove.textContent = '✕';
+      remove.setAttribute('aria-label', `Delete saved search: ${s.label}`);
       remove.onclick = () => deleteState(i);
       entry.append(label, remove);
       el.appendChild(entry);
@@ -380,7 +470,8 @@
         .bindPopup(`<b>#${i+1} ${r.name}</b><br>${r.address}<br>Distance: ${(r.distance_meters/1000).toFixed(2)} km<br>BM25: ${r.bm25_score.toFixed(3)} | Spatial: ${r.spatial_score.toFixed(3)}<br><b>Final: ${r.final_score.toFixed(3)}</b>`)
         .addTo(map);
       resultMarkers.push(m);
-      const card = document.createElement('div');
+      const card = document.createElement('button');
+      card.type = 'button';
       card.className = 'result-card';
       card.innerHTML = `
         <span class="rank">#${i+1}</span>
