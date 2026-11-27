@@ -63,26 +63,32 @@ def search():
     if not (INDEX_PATH / "segments.gen").exists() and not any(INDEX_PATH.glob("segments_*")):
         return jsonify({"error": "Lucene index is missing. Run python -m src.text.bm25_search --build-only, then restart the server."}), 503
 
+    try:
+        candidate_limit = int(request.args.get("candidate_limit", 50))
+    except (TypeError, ValueError):
+        return jsonify({"error": "candidate_limit must be an integer"}), 400
+
     from src.search.adapters import pyserini_filtered_bm25_search
     from src.search.hybrid_search import exponential_distance_decay, search_restaurants
     from src.text.bm25_search import open_searcher
 
+    radius_meters = radius_miles * 1609.344
+
     try:
-        # R-tree access is serialized because libspatialindex is not thread-safe.
         with _search_lock:
             spatial_candidates = _spatial_candidates()
             lucene_searcher = open_searcher(INDEX_PATH)
             try:
-                results = search_restaurants(
+                result = search_restaurants(
                     query=query,
                     user_latitude=lat,
                     user_longitude=lon,
-                    radius_meters=radius_miles * 1609.344,
+                    radius_meters=radius_meters,
                     spatial_candidates=spatial_candidates,
                     bm25_search=pyserini_filtered_bm25_search(lucene_searcher),
                     distance_decay=exponential_distance_decay(5 * 1609.344),
-                    candidate_limit=50,
-                    top_k=top_k,
+                    candidate_limit=candidate_limit,
+                    top_k=candidate_limit,
                 )
             finally:
                 lucene_searcher.close()
@@ -90,7 +96,10 @@ def search():
         app.logger.exception("Hybrid search failed")
         return jsonify({"error": "Search failed. Check the server log and the Python/Java environment, then verify the Lucene index."}), 500
 
-    return jsonify([asdict(result) for result in results])
+    return jsonify({
+        "bm25_ranking": [asdict(r) for r in result.bm25_ranking],
+        "hybrid_ranking": [asdict(r) for r in result.hybrid_ranking],
+    })
 
 
 @lru_cache(maxsize=1)

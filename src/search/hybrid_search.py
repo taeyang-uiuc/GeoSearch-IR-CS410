@@ -38,6 +38,14 @@ class SearchResult:
     final_score: float
 
 
+@dataclass(frozen=True)
+class HybridSearchResult:
+    """Both rankings returned by the hybrid pipeline."""
+
+    bm25_ranking: list[SearchResult]
+    hybrid_ranking: list[SearchResult]
+
+
 class SpatialCandidateProvider(Protocol):
     """Returns broad spatial candidates with restaurant metadata."""
 
@@ -107,7 +115,7 @@ def search_restaurants(
     top_k: int = 2,
     bm25_weight: float = 0.75,
     spatial_weight: float = 0.25,
-) -> list[SearchResult]:
+) -> HybridSearchResult:
     """Run the GeoSearch-IR hybrid query pipeline.
 
     ``spatial_candidates`` may return a broad R-tree bounding-box result. This
@@ -134,7 +142,7 @@ def search_restaurants(
         radius_meters,
     )
     if not candidates_by_id:
-        return []
+        return HybridSearchResult(bm25_ranking=[], hybrid_ranking=[])
 
     allowed_ids = set(candidates_by_id)
     bm25_hits = _coerce_bm25_hits(
@@ -142,7 +150,7 @@ def search_restaurants(
         allowed_ids,
     )
     if not bm25_hits:
-        return []
+        return HybridSearchResult(bm25_ranking=[], hybrid_ranking=[])
 
     normalized_bm25 = _normalize_bm25_scores(bm25_hits)
     results: list[SearchResult] = []
@@ -165,7 +173,7 @@ def search_restaurants(
             )
         )
 
-    return sorted(
+    hybrid_ranking = sorted(
         results,
         key=lambda result: (
             -result.final_score,
@@ -174,6 +182,8 @@ def search_restaurants(
             result.restaurant_id,
         ),
     )[:top_k]
+
+    return HybridSearchResult(bm25_ranking=results, hybrid_ranking=hybrid_ranking)
 
 
 def _exact_radius_candidates(

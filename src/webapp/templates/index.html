@@ -56,7 +56,7 @@
 
     #controls {
       display: grid;
-      grid-template-columns: minmax(200px, 2.4fr) repeat(4, minmax(90px, 1fr)) auto;
+      grid-template-columns: minmax(200px, 2.4fr) repeat(5, minmax(80px, 1fr)) auto;
       align-items: end;
       gap: 12px;
     }
@@ -115,6 +115,9 @@
 
     .result-card:hover { background: #eaf5ef; border-color: #99c7b5; }
     .result-card .rank, .result-card .scores { color: var(--accent); font-size: .79rem; font-weight: 700; }
+    .result-card .rank.bm25 { color: #2563eb; }
+    .result-card.bm25-card { border-left: 3px solid #2563eb; }
+    .result-card.hybrid-card { border-left: 3px solid var(--accent); }
     .result-card .name { font-weight: 700; }
     .result-card .meta { color: var(--muted); font-size: .86rem; }
     .amenities { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
@@ -131,6 +134,13 @@
     .venue-popup summary { cursor: pointer; font-weight: 700; }
     .venue-popup .popup-amenities { max-height: 120px; overflow-y: auto; gap: 4px; margin-bottom: 0; }
     .venue-popup .amenity { font-size: .72rem; padding: 2px 5px; }
+
+    .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .tab-btn { flex: 1; padding: 7px; border-radius: 8px; border: 1px solid var(--border); background: #f8fbf9; color: var(--muted); font-weight: 700; font-size: .82rem; cursor: pointer; }
+    .tab-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
+    .tab-btn.bm25.active { background: #2563eb; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
 
     #saved-panel { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px; }
     #saved-panel .actions { margin: 8px 0 12px; }
@@ -185,6 +195,9 @@
       <label class="field">Top K
         <input type="number" id="topk" value="10" min="1" max="50" step="1" />
       </label>
+      <label class="field">Candidate Limit
+        <input type="number" id="candidate_limit" value="20" min="1" step="1" />
+      </label>
       <div class="actions">
         <button class="action primary" type="submit">Search</button>
         <button class="action" type="button" onclick="useMyLocation()">My Location</button>
@@ -195,7 +208,16 @@
       <div id="map" aria-label="Restaurant map"></div>
       <aside id="sidebar" aria-label="Search results and saved searches">
         <h2>Search Results</h2>
-        <div id="results-list"><p class="empty">Run a search to see results here.</p></div>
+        <div class="tabs">
+          <button type="button" class="tab-btn active" onclick="switchTab('hybrid')">Hybrid Ranking</button>
+          <button type="button" class="tab-btn bm25" onclick="switchTab('bm25')">BM25 Only</button>
+        </div>
+        <div id="tab-hybrid" class="tab-pane active">
+          <div id="hybrid-list"><p class="empty">Run a search to see results here.</p></div>
+        </div>
+        <div id="tab-bm25" class="tab-pane">
+          <div id="bm25-list"><p class="empty">Run a search to see results here.</p></div>
+        </div>
         <section id="saved-panel">
           <h2>Saved States</h2>
           <input type="text" id="state-name" aria-label="Saved search name" placeholder="Saved search name (optional)" />
@@ -230,10 +252,12 @@
   });
 
   let restaurantLookup = {};   // business_id → {lat, lon, name, address, city, state}
-  let resultMarkers = [];
+  let hybridMarkers = [], bm25Markers = [];
   let userMarker = null;
+  let radiusCircle = null;
   let searchVersion = 0;
   let lastSearchState = null;
+  let activeTab = 'hybrid';
 
   const amenityFields = [
     ['GoodForKids', 'Kid friendly'], ['OutdoorSeating', 'Outdoor seating'],
@@ -279,16 +303,35 @@
     </div>`;
   }
 
-  function resultCard(result, venue, rank) {
+  function resultCard(result, venue, rank, isBm25 = false) {
     const card = document.createElement('button');
     card.type = 'button';
-    card.className = 'result-card';
-    card.innerHTML = `<span class="rank">#${rank}</span>
+    card.className = `result-card ${isBm25 ? 'bm25-card' : 'hybrid-card'}`;
+    const rankLabel = isBm25
+      ? `<span class="rank bm25">#${rank} BM25</span>`
+      : `<span class="rank">#${rank} Hybrid</span>`;
+    const scores = isBm25
+      ? `BM25: ${result.bm25_score.toFixed(3)} · Dist: ${(result.distance_meters/1000).toFixed(2)} km`
+      : `Final: ${result.final_score.toFixed(3)} · BM25: ${result.bm25_score.toFixed(3)} · Spatial: ${result.spatial_score.toFixed(3)}`;
+    card.innerHTML = `${rankLabel}
       <div class="name">${escapeHtml(venue.name)}</div>
       <div class="meta">${escapeHtml(venue.address || '')} · ${(result.distance_meters / 1000).toFixed(2)} km away</div>
       ${amenitiesHtml(venue)}
-      <div class="scores">BM25: ${result.bm25_score.toFixed(3)} · Spatial: ${result.spatial_score.toFixed(3)} · Final: ${result.final_score.toFixed(3)}</div>`;
+      <div class="scores">${scores}</div>`;
     return card;
+  }
+
+  function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('active',
+        (tab === 'hybrid' && !b.classList.contains('bm25')) ||
+        (tab === 'bm25'   &&  b.classList.contains('bm25')));
+    });
+    hybridMarkers.forEach(m => tab === 'hybrid' ? m.addTo(map) : map.removeLayer(m));
+    bm25Markers.forEach(m   => tab === 'bm25'   ? m.addTo(map) : map.removeLayer(m));
   }
 
   // Load all restaurants once
@@ -330,6 +373,41 @@
     }, () => { document.getElementById('status').textContent = 'Could not get location. Click the map or enter coordinates.'; });
   }
 
+  function renderRanking(results, listId, isBm25, mapLimit = Infinity) {
+    const list = document.getElementById(listId);
+    list.innerHTML = '';
+    if (!results.length) { list.innerHTML = '<p class="empty">No results.</p>'; return; }
+    const markerStyle = isBm25
+      ? { radius: 9, fillColor: '#2563eb', color: '#fff', weight: 2, fillOpacity: 0.95 }
+      : { radius: 9, fillColor: '#d45139', color: '#fff', weight: 2, fillOpacity: 0.95 };
+    results.forEach((r, i) => {
+      const info = restaurantLookup[r.restaurant_id];
+      if (!info) return;
+      const card = resultCard(r, info, i + 1, isBm25);
+      if (i < mapLimit) {
+        const m = L.circleMarker([info.lat, info.lon], markerStyle)
+          .bindPopup(resultPopup(info, r, i + 1));
+        if (isBm25) { bm25Markers.push(m); if (activeTab === 'bm25') m.addTo(map); }
+        else        { hybridMarkers.push(m); if (activeTab === 'hybrid') m.addTo(map); }
+        card.onclick = () => {
+          const flash = L.circleMarker([info.lat, info.lon],
+            { radius: 14, fillColor: '#facc15', color: '#92400e', weight: 2, fillOpacity: 0.85 }
+          ).addTo(map);
+          setTimeout(() => map.removeLayer(flash), 1800);
+          m.openPopup();
+        };
+      } else {
+        card.onclick = () => {
+          const flash = L.circleMarker([info.lat, info.lon],
+            { radius: 14, fillColor: '#facc15', color: '#92400e', weight: 2, fillOpacity: 0.85 }
+          ).addTo(map);
+          setTimeout(() => map.removeLayer(flash), 1800);
+        };
+      }
+      list.appendChild(card);
+    });
+  }
+
   async function runSearch() {
     const version = ++searchVersion;
     lastSearchState = null;
@@ -339,6 +417,7 @@
     const lon   = parseFloat(document.getElementById('lon').value);
     const radius = Number(document.getElementById('radius').value || 25);
     const topk   = Number(document.getElementById('topk').value || 10);
+    const candLimit = Number(document.getElementById('candidate_limit').value || 20);
 
     if (!query || !Number.isFinite(lat) || lat < -90 || lat > 90 ||
         !Number.isFinite(lon) || lon < -180 || lon > 180 ||
@@ -349,17 +428,26 @@
     }
 
     document.getElementById('status').textContent = 'Searching…';
-    document.getElementById('results-list').innerHTML = '';
+    document.getElementById('hybrid-list').innerHTML = '';
+    document.getElementById('bm25-list').innerHTML = '';
 
-    resultMarkers.forEach(m => map.removeLayer(m));
-    resultMarkers = [];
-    if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+    hybridMarkers.forEach(m => map.removeLayer(m)); hybridMarkers = [];
+    bm25Markers.forEach(m => map.removeLayer(m));   bm25Markers = [];
+    if (userMarker)   { map.removeLayer(userMarker);   userMarker = null; }
+    if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
 
     userMarker = L.marker([lat, lon], { icon: pinIcon })
       .bindPopup('<b>Your location</b>')
       .addTo(map);
 
-    const url = `/api/search?query=${encodeURIComponent(query)}&lat=${lat}&lon=${lon}&radius_miles=${radius}&top_k=${topk}`;
+    radiusCircle = L.circle([lat, lon], {
+      radius: radius * 1609.344,
+      color: '#17634f', weight: 2, dashArray: '8 6',
+      fill: true, fillColor: '#17634f', fillOpacity: 0.04, opacity: 0.8,
+    }).addTo(map);
+    map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+
+    const url = `/api/search?query=${encodeURIComponent(query)}&lat=${lat}&lon=${lon}&radius_miles=${radius}&top_k=${topk}&candidate_limit=${candLimit}`;
     fetch(url)
       .then(async response => {
         const data = await response.json();
@@ -372,32 +460,13 @@
           document.getElementById('status').textContent = 'Error: ' + results.error;
           return;
         }
-        document.getElementById('status').textContent = `${results.length} result(s) found`;
-        lastSearchState = { query, lat, lon, radius, topk, results };
+        const { hybrid_ranking, bm25_ranking } = results;
+        document.getElementById('status').textContent =
+          `Hybrid: ${hybrid_ranking.length} · BM25: ${bm25_ranking.length} result(s)`;
+        lastSearchState = { query, lat, lon, radius, topk, candLimit, hybrid_ranking, bm25_ranking };
 
-        const list = document.getElementById('results-list');
-        list.innerHTML = '';
-
-        if (!results.length) {
-          list.innerHTML = '<p class="empty">No results found for this query and location.</p>';
-          return;
-        }
-
-        results.forEach((r, i) => {
-          const info = restaurantLookup[r.restaurant_id];
-          if (!info) return;
-
-          const m = L.circleMarker([info.lat, info.lon], highlightStyle)
-            .bindPopup(resultPopup(info, r, i + 1))
-            .addTo(map);
-          resultMarkers.push(m);
-
-          const card = resultCard(r, info, i + 1);
-          card.onclick = () => { map.setView([info.lat, info.lon], 14); m.openPopup(); };
-          list.appendChild(card);
-        });
-
-        map.setView([lat, lon], 12);
+        renderRanking(hybrid_ranking, 'hybrid-list', false, topk);
+        renderRanking(bm25_ranking,   'bm25-list',   true,  topk);
       })
       .catch(err => {
         if (version !== searchVersion) return;
@@ -478,7 +547,8 @@
     document.getElementById('lon').value    = s.lon;
     document.getElementById('radius').value = s.radius;
     document.getElementById('topk').value   = s.topk;
-    if (Array.isArray(s.results)) {
+    if (s.candLimit) document.getElementById('candidate_limit').value = s.candLimit;
+    if (s.hybrid_ranking) {
       lastSearchState = s;
       restoreResults(s);
     } else {
@@ -495,25 +565,19 @@
 
   function restoreResults(s) {
     const lat = parseFloat(s.lat), lon = parseFloat(s.lon);
-    resultMarkers.forEach(m => map.removeLayer(m));
-    resultMarkers = [];
-    if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+    hybridMarkers.forEach(m => map.removeLayer(m)); hybridMarkers = [];
+    bm25Markers.forEach(m => map.removeLayer(m));   bm25Markers = [];
+    if (userMarker)   { map.removeLayer(userMarker);   userMarker = null; }
+    if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
     userMarker = L.marker([lat, lon], { icon: pinIcon }).bindPopup('<b>Your location</b>').addTo(map);
-    const list = document.getElementById('results-list');
-    list.innerHTML = '';
-    s.results.forEach((r, i) => {
-      const info = restaurantLookup[r.restaurant_id];
-      if (!info) return;
-      const m = L.circleMarker([info.lat, info.lon], highlightStyle)
-        .bindPopup(resultPopup(info, r, i + 1))
-        .addTo(map);
-      resultMarkers.push(m);
-      const card = resultCard(r, info, i + 1);
-      card.onclick = () => { map.setView([info.lat, info.lon], 14); m.openPopup(); };
-      list.appendChild(card);
-    });
-    map.setView([lat, lon], 12);
-    document.getElementById('status').textContent = `Loaded: ${s.results.length} result(s)`;
+    radiusCircle = L.circle([lat, lon], {
+      radius: s.radius * 1609.344, color: '#17634f', weight: 2, dashArray: '8 6',
+      fill: true, fillColor: '#17634f', fillOpacity: 0.04, opacity: 0.8,
+    }).addTo(map);
+    renderRanking(s.hybrid_ranking || [], 'hybrid-list', false, s.topk);
+    renderRanking(s.bm25_ranking   || [], 'bm25-list',   true,  s.topk);
+    map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+    document.getElementById('status').textContent = `Loaded: ${(s.hybrid_ranking||[]).length} hybrid result(s)`;
   }
 
   renderSaved();

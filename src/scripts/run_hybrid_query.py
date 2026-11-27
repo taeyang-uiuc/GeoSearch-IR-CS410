@@ -20,7 +20,7 @@ from src.search.adapters import (
     pyserini_filtered_bm25_search,
     rtree_candidate_provider,
 )
-from src.search.hybrid_search import exponential_distance_decay, search_restaurants
+from src.search.hybrid_search import exponential_distance_decay, search_restaurants, HybridSearchResult
 from src.text.bm25_search import INPUT_FILE, WORK_DIR, open_searcher
 
 
@@ -82,7 +82,16 @@ def main() -> None:
     finally:
         lucene_searcher.close()
 
-    print(json.dumps([asdict(result) for result in results], indent=2))
+    print("\n=== BM25 Ranking ===")
+    for i, r in enumerate(results.bm25_ranking, 1):
+        print(f"{i:>3}. {r.name} | bm25={r.bm25_score:.4f} | dist={r.distance_meters:.0f}m")
+
+    print("\n=== Hybrid Ranking ===")
+    for i, r in enumerate(results.hybrid_ranking, 1):
+        print(f"{i:>3}. {r.name} | final={r.final_score:.4f} | bm25={r.bm25_score:.4f} | spatial={r.spatial_score:.4f} | dist={r.distance_meters:.0f}m")
+
+    print("\n=== Full JSON (Hybrid) ===")
+    print(json.dumps([asdict(r) for r in results.hybrid_ranking], indent=2))
 
 
 if __name__ == "__main__":
